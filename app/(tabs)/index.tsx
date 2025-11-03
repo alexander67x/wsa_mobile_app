@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Search, MapPin, Calendar, ChartBar as BarChart3, Plus } from 'lucide-react-native';
+import { listProjects } from '@/services/projects';
+import type { Project } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
 
 interface Project {
@@ -15,54 +17,16 @@ interface Project {
   reportsCount: number;
 }
 
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    name: 'Edificio Residencial Norte',
-    location: 'Av. Principal 123, Lima',
-    progress: 75,
-    status: 'active',
-    dueDate: '2024-03-15',
-    tasksCount: 12,
-    reportsCount: 8,
-  },
-  {
-    id: '2',
-    name: 'Centro Comercial Plaza',
-    location: 'Jr. Comercio 456, Callao',
-    progress: 45,
-    status: 'active',
-    dueDate: '2024-04-20',
-    tasksCount: 18,
-    reportsCount: 15,
-  },
-  {
-    id: '3',
-    name: 'Complejo Deportivo',
-    location: 'Av. Deportiva 789, San Miguel',
-    progress: 90,
-    status: 'active',
-    dueDate: '2024-02-28',
-    tasksCount: 8,
-    reportsCount: 12,
-  },
-  {
-    id: '4',
-    name: 'Oficinas Corporativas',
-    location: 'Av. Empresarial 321, Miraflores',
-    progress: 25,
-    status: 'pending',
-    dueDate: '2024-05-10',
-    tasksCount: 20,
-    reportsCount: 3,
-  },
-];
-
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [projects, setProjects] = useState<Project[]>([]);
 
-  const filteredProjects = mockProjects.filter(project => {
+  useEffect(() => {
+    listProjects().then(setProjects).catch(() => setProjects([]));
+  }, []);
+
+  const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          project.location.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = selectedFilter === 'all' || project.status === selectedFilter;
@@ -90,11 +54,11 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      
+
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.greeting}>Buenos días</Text>
-          <Text style={styles.userName}>Supervisor</Text>
+          <Text style={styles.greeting}>Bienvenido</Text>
+          <Text style={styles.userName}>Supervisor de Seguridad</Text>
         </View>
 
         <View style={styles.searchContainer}>
@@ -128,7 +92,7 @@ export default function HomeScreen() {
               >
                 <Text style={[
                   styles.filterButtonText,
-                  selectedFilter === filter.key && styles.filterButtonTextActive
+                  selectedFilter === filter.key && styles.filterButtonTextActive,
                 ]}>
                   {filter.label}
                 </Text>
@@ -143,16 +107,13 @@ export default function HomeScreen() {
           <TouchableOpacity
             key={project.id}
             style={styles.projectCard}
-            onPress={() => router.push({
-              pathname: '/project-detail',
-              params: { projectId: project.id }
-            })}
+            onPress={() => router.push({ pathname: '/project-detail', params: { projectId: project.id } })}
           >
             <View style={styles.projectHeader}>
               <View style={styles.projectInfo}>
                 <Text style={styles.projectName}>{project.name}</Text>
                 <View style={styles.projectLocation}>
-                  <MapPin size={16} color="#6B7280" />
+                  <MapPin size={14} color="#6B7280" />
                   <Text style={styles.projectLocationText}>{project.location}</Text>
                 </View>
               </View>
@@ -165,15 +126,15 @@ export default function HomeScreen() {
 
             <View style={styles.progressContainer}>
               <View style={styles.progressHeader}>
-                <Text style={styles.progressLabel}>Progreso del proyecto</Text>
+                <Text style={styles.progressLabel}>Progreso</Text>
                 <Text style={styles.progressPercentage}>{project.progress}%</Text>
               </View>
               <View style={styles.progressBar}>
-                <View 
+                <View
                   style={[
                     styles.progressFill,
                     { width: `${project.progress}%`, backgroundColor: getStatusColor(project.status) }
-                  ]} 
+                  ]}
                 />
               </View>
             </View>
@@ -200,165 +161,40 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: '#FFFFFF', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20,
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5,
   },
-  headerTop: {
-    marginBottom: 24,
-  },
-  greeting: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginTop: 4,
-  },
-  searchContainer: {
-    marginBottom: 20,
-  },
-  searchInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 48,
-  },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  filterContainer: {
-    marginBottom: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
-  },
-  filterButtonActive: {
-    backgroundColor: '#2563EB',
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  filterButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  projectsList: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  projectCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  projectHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  projectInfo: {
-    flex: 1,
-  },
-  projectName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  projectLocation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  projectLocationText: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginLeft: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  progressPercentage: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  projectStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  statText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: '#6B7280',
-  },
+  headerTop: { marginBottom: 24 },
+  greeting: { fontSize: 16, color: '#6B7280' },
+  userName: { fontSize: 28, fontWeight: 'bold', color: '#1F2937', marginTop: 4 },
+  searchContainer: { marginBottom: 20 },
+  searchInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 16, height: 48 },
+  searchIcon: { marginRight: 12 },
+  searchInput: { flex: 1, fontSize: 16, color: '#1F2937' },
+  filterContainer: { marginBottom: 8 },
+  filterButton: { paddingHorizontal: 16, paddingVertical: 8, marginRight: 12, backgroundColor: '#F3F4F6', borderRadius: 20 },
+  filterButtonActive: { backgroundColor: '#2563EB' },
+  filterButtonText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
+  filterButtonTextActive: { color: '#FFFFFF' },
+  projectsList: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
+  projectCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  projectHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  projectInfo: { flex: 1 },
+  projectName: { fontSize: 18, fontWeight: '600', color: '#1F2937' },
+  projectLocation: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  projectLocationText: { fontSize: 14, color: '#6B7280', marginLeft: 6 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 20 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  progressContainer: { marginBottom: 12 },
+  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  progressLabel: { color: '#6B7280' },
+  progressPercentage: { color: '#1F2937', fontWeight: '600' },
+  progressBar: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 9999 },
+  progressFill: { height: 8, borderRadius: 9999 },
+  projectStats: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  statItem: { flexDirection: 'row', alignItems: 'center' },
+  statText: { marginLeft: 6, color: '#6B7280' },
 });

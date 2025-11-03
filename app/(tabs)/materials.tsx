@@ -1,72 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Package, Clock, CircleCheck as CheckCircle, Circle as XCircle, Calendar } from 'lucide-react-native';
+import { listMaterialRequests } from '@/services/materials';
+import type { MaterialRequest } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
-
-interface MaterialRequest {
-  id: string;
-  projectName: string;
-  materialName: string;
-  quantity: number;
-  unit: string;
-  requestDate: string;
-  status: 'pending' | 'approved' | 'rejected' | 'delivered';
-  priority: 'low' | 'medium' | 'high';
-  observations?: string;
-}
-
-const mockRequests: MaterialRequest[] = [
-  {
-    id: '1',
-    projectName: 'Edificio Residencial Norte',
-    materialName: 'Cemento Portland',
-    quantity: 50,
-    unit: 'sacos',
-    requestDate: '2024-02-10',
-    status: 'delivered',
-    priority: 'high',
-  },
-  {
-    id: '2',
-    projectName: 'Centro Comercial Plaza',
-    materialName: 'Varillas de acero 3/8"',
-    quantity: 100,
-    unit: 'unidades',
-    requestDate: '2024-02-11',
-    status: 'approved',
-    priority: 'medium',
-    observations: 'Entrega programada para el 15/02',
-  },
-  {
-    id: '3',
-    projectName: 'Edificio Residencial Norte',
-    materialName: 'Cables eléctricos 12 AWG',
-    quantity: 200,
-    unit: 'metros',
-    requestDate: '2024-02-12',
-    status: 'pending',
-    priority: 'medium',
-  },
-  {
-    id: '4',
-    projectName: 'Complejo Deportivo',
-    materialName: 'Pintura exterior blanca',
-    quantity: 10,
-    unit: 'galones',
-    requestDate: '2024-02-09',
-    status: 'rejected',
-    priority: 'low',
-    observations: 'Presupuesto insuficiente',
-  },
-];
 
 export default function MaterialsScreen() {
   const [activeFilter, setActiveFilter] = useState('all');
+  const [requests, setRequests] = useState<MaterialRequest[]>([]);
 
-  const filteredRequests = mockRequests.filter(request => {
+  useEffect(() => {
+    listMaterialRequests().then(setRequests).catch(() => setRequests([]));
+  }, []);
+
+  const filteredRequests = requests.filter(request => {
     if (activeFilter === 'all') return true;
-    return request.status === activeFilter;
+    return request.status === (activeFilter as any);
   });
 
   const getStatusColor = (status: string) => {
@@ -120,11 +70,11 @@ export default function MaterialsScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      
+
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Solicitudes de Material</Text>
-          <TouchableOpacity 
+          <Text style={styles.title}>Solicitudes de Equipos de Seguridad</Text>
+          <TouchableOpacity
             style={styles.addButton}
             onPress={() => router.push('/request-material')}
           >
@@ -135,11 +85,11 @@ export default function MaterialsScreen() {
         <View style={styles.filterContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {[
-              { key: 'all', label: 'Todas', count: mockRequests.length },
-              { key: 'pending', label: 'Pendientes', count: mockRequests.filter(r => r.status === 'pending').length },
-              { key: 'approved', label: 'Aprobadas', count: mockRequests.filter(r => r.status === 'approved').length },
-              { key: 'delivered', label: 'Entregadas', count: mockRequests.filter(r => r.status === 'delivered').length },
-              { key: 'rejected', label: 'Rechazadas', count: mockRequests.filter(r => r.status === 'rejected').length },
+              { key: 'all', label: 'Todos', count: requests.length },
+              { key: 'pending', label: 'Pendientes', count: requests.filter(r => r.status === 'pending').length },
+              { key: 'approved', label: 'Aprobados', count: requests.filter(r => r.status === 'approved').length },
+              { key: 'delivered', label: 'Entregados', count: requests.filter(r => r.status === 'delivered').length },
+              { key: 'rejected', label: 'Rechazados', count: requests.filter(r => r.status === 'rejected').length },
             ].map(filter => (
               <TouchableOpacity
                 key={filter.key}
@@ -151,7 +101,7 @@ export default function MaterialsScreen() {
               >
                 <Text style={[
                   styles.filterButtonText,
-                  activeFilter === filter.key && styles.filterButtonTextActive
+                  activeFilter === filter.key && styles.filterButtonTextActive,
                 ]}>
                   {filter.label} ({filter.count})
                 </Text>
@@ -169,7 +119,7 @@ export default function MaterialsScreen() {
                 <Text style={styles.materialName}>{request.materialName}</Text>
                 <Text style={styles.projectName}>{request.projectName}</Text>
               </View>
-              <View style={styles.statusContainer}>
+              <View style={styles.statusBadge}>
                 {getStatusIcon(request.status)}
                 <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
                   {getStatusText(request.status)}
@@ -298,19 +248,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
   },
   projectName: {
     fontSize: 14,
     color: '#6B7280',
+    marginTop: 4,
   },
-  statusContainer: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
   },
   statusText: {
     marginLeft: 6,
@@ -318,10 +268,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   quantityContainer: {
+    marginTop: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
   },
   quantityInfo: {
     flexDirection: 'row',
@@ -329,48 +279,40 @@ const styles = StyleSheet.create({
   },
   quantityText: {
     marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1F2937',
+    color: '#374151',
   },
   priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   priorityText: {
     fontSize: 12,
     fontWeight: '600',
   },
   observationsContainer: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+    marginTop: 12,
   },
   observationsLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
+    color: '#6B7280',
     marginBottom: 4,
   },
   observationsText: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
+    color: '#374151',
   },
   requestFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 12,
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   dateText: {
-    marginLeft: 6,
-    fontSize: 12,
+    marginLeft: 8,
     color: '#6B7280',
   },
 });

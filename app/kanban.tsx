@@ -21,74 +21,18 @@ interface KanbanData {
 
 const mockKanbanData: KanbanData = {
   pending: [
-    {
-      id: '1',
-      title: 'Instalación eléctrica piso 3',
-      project: 'Edificio Residencial Norte',
-      assignee: 'Juan Pérez',
-      priority: 'high',
-      type: 'task',
-    },
-    {
-      id: '2',
-      title: 'Reporte de calidad materiales',
-      project: 'Centro Comercial Plaza',
-      assignee: 'María García',
-      priority: 'medium',
-      type: 'report',
-    },
-    {
-      id: '3',
-      title: 'Acabados sala principal',
-      project: 'Edificio Residencial Norte',
-      assignee: 'Carlos Ruiz',
-      priority: 'medium',
-      type: 'task',
-    },
+    { id: '1', title: 'Tendido de UTP – Nivel 2', project: 'Green Tower', assignee: 'Luis M.', priority: 'high', type: 'task' },
+    { id: '2', title: 'Reporte de pruebas de sensores', project: 'Parque Industrial Orión', assignee: 'Karla G.', priority: 'medium', type: 'report' },
+    { id: '3', title: 'Montaje de cámaras – Lobby', project: 'Green Tower', assignee: 'Carlos R.', priority: 'medium', type: 'task' },
   ],
   in_progress: [
-    {
-      id: '4',
-      title: 'Pintura fachada norte',
-      project: 'Complejo Deportivo',
-      assignee: 'Ana Torres',
-      priority: 'high',
-      type: 'task',
-    },
-    {
-      id: '5',
-      title: 'Inspección estructural',
-      project: 'Oficinas Corporativas',
-      assignee: 'Pedro López',
-      priority: 'high',
-      type: 'report',
-    },
+    { id: '4', title: 'Configuración NVR principal', project: 'Data Center Norte', assignee: 'Ana T.', priority: 'high', type: 'task' },
+    { id: '5', title: 'Incidente: caída de enlace PoE', project: 'Campus Corporativo Andina', assignee: 'Pedro L.', priority: 'high', type: 'report' },
   ],
   completed: [
-    {
-      id: '6',
-      title: 'Cimentación completa',
-      project: 'Edificio Residencial Norte',
-      assignee: 'Roberto Silva',
-      priority: 'high',
-      type: 'task',
-    },
-    {
-      id: '7',
-      title: 'Reporte avance semanal',
-      project: 'Centro Comercial Plaza',
-      assignee: 'Lucía Mendoza',
-      priority: 'medium',
-      type: 'report',
-    },
-    {
-      id: '8',
-      title: 'Instalación plomería',
-      project: 'Complejo Deportivo',
-      assignee: 'Diego Fernández',
-      priority: 'low',
-      type: 'task',
-    },
+    { id: '6', title: 'Instalación sirenas exteriores', project: 'Green Tower', assignee: 'Roberto S.', priority: 'high', type: 'task' },
+    { id: '7', title: 'Avance semanal – Data Center', project: 'Data Center Norte', assignee: 'Lucía M.', priority: 'medium', type: 'report' },
+    { id: '8', title: 'Calibración de cámaras PTZ', project: 'Parque Industrial Orión', assignee: 'Diego F.', priority: 'low', type: 'task' },
   ],
 };
 
@@ -102,10 +46,6 @@ export default function KanbanScreen() {
       case 'low': return '#10B981';
       default: return '#6B7280';
     }
-  };
-
-  const getTypeIcon = (type: string) => {
-    return type === 'report' ? '📊' : '🔧';
   };
 
   const getColumnIcon = (column: string) => {
@@ -137,7 +77,7 @@ export default function KanbanScreen() {
 
   const renderColumn = (column: keyof KanbanData) => {
     const tasks = kanbanData[column];
-    
+
     return (
       <View key={column} style={styles.column}>
         <View style={[styles.columnHeader, { backgroundColor: getColumnColor(column) }]}>
@@ -152,19 +92,19 @@ export default function KanbanScreen() {
           {tasks.map(task => (
             <View key={task.id} style={styles.taskCard}>
               <View style={styles.taskHeader}>
-                <Text style={styles.taskType}>{getTypeIcon(task.type)}</Text>
+                <Text style={styles.taskType}>{task.type === 'report' ? 'REP' : 'TAR'}</Text>
                 <View style={[styles.priorityIndicator, { backgroundColor: getPriorityColor(task.priority) }]} />
               </View>
-              
+
               <Text style={styles.taskTitle}>{task.title}</Text>
               <Text style={styles.taskProject}>{task.project}</Text>
-              
+
               <View style={styles.taskFooter}>
                 <Text style={styles.taskAssignee}>{task.assignee}</Text>
               </View>
             </View>
           ))}
-          
+
           <TouchableOpacity style={styles.addTaskButton}>
             <Plus size={16} color="#6B7280" />
             <Text style={styles.addTaskText}>Agregar {column === 'pending' ? 'tarea' : 'elemento'}</Text>
@@ -177,12 +117,9 @@ export default function KanbanScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
+
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Tablero Kanban</Text>
@@ -190,11 +127,7 @@ export default function KanbanScreen() {
       </View>
 
       <View style={styles.content}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.kanbanBoard}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kanbanBoard}>
           {renderColumn('pending')}
           {renderColumn('in_progress')}
           {renderColumn('completed')}
@@ -223,173 +156,33 @@ export default function KanbanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    backgroundColor: '#2563EB',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  content: {
-    flex: 1,
-    paddingTop: 20,
-  },
-  kanbanBoard: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  column: {
-    width: 280,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  columnHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    gap: 8,
-  },
-  columnTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    flex: 1,
-  },
-  columnBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  columnCount: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  columnContent: {
-    padding: 16,
-    maxHeight: 500,
-  },
-  taskCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#E5E7EB',
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  taskType: {
-    fontSize: 16,
-  },
-  priorityIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  taskTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 6,
-    lineHeight: 20,
-  },
-  taskProject: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 12,
-  },
-  taskFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  taskAssignee: {
-    fontSize: 12,
-    color: '#2563EB',
-    fontWeight: '500',
-  },
-  addTaskButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    gap: 6,
-  },
-  addTaskText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  legendContainer: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  legendItems: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendColor: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
+  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
+  content: { flex: 1 },
+  kanbanBoard: { padding: 12 },
+  column: { width: 280, marginRight: 12 },
+  columnHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  columnTitle: { fontWeight: '700', color: '#111827' },
+  columnBadge: { backgroundColor: '#FFFFFF', borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 },
+  columnCount: { fontWeight: '700', color: '#111827' },
+  columnContent: { backgroundColor: '#FFFFFF', padding: 12, borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
+  taskCard: { backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  taskType: { fontSize: 12, color: '#6B7280' },
+  priorityIndicator: { width: 8, height: 8, borderRadius: 4 },
+  taskTitle: { fontSize: 14, fontWeight: '600', color: '#111827', marginTop: 6 },
+  taskProject: { fontSize: 12, color: '#6B7280' },
+  taskFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  taskAssignee: { color: '#6B7280' },
+  addTaskButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 8 },
+  addTaskText: { marginLeft: 6, color: '#6B7280' },
+  legendContainer: { padding: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E5E7EB' },
+  legendTitle: { fontWeight: '700', color: '#111827' },
+  legendItems: { flexDirection: 'row', marginTop: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
+  legendColor: { width: 12, height: 12, borderRadius: 6, marginRight: 6 },
+  legendText: { color: '#6B7280' },
 });
+

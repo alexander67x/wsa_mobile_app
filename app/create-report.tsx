@@ -5,16 +5,16 @@ import { ArrowLeft, FileText, Camera, MapPin, Save } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 
 const reportTypes = [
-  { key: 'progress', label: 'Reporte de Avance', color: '#2563EB' },
-  { key: 'incident', label: 'Incidencia', color: '#F59E0B' },
-  { key: 'quality', label: 'Control de Calidad', color: '#10B981' },
+  { key: 'progress', label: 'Avance de Instalación', color: '#2563EB' },
+  { key: 'incident', label: 'Incidente de Seguridad', color: '#F59E0B' },
+  { key: 'quality', label: 'Pruebas y Calidad', color: '#10B981' },
 ];
 
 const projects = [
-  { id: '1', name: 'Edificio Residencial Norte' },
-  { id: '2', name: 'Centro Comercial Plaza' },
-  { id: '3', name: 'Complejo Deportivo' },
-  { id: '4', name: 'Oficinas Corporativas' },
+  { id: '1', name: 'Green Tower' },
+  { id: '2', name: 'Data Center Norte' },
+  { id: '3', name: 'Parque Industrial Orión' },
+  { id: '4', name: 'Campus Corporativo Andina' },
 ];
 
 export default function CreateReportScreen() {

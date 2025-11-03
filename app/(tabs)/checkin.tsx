@@ -18,7 +18,7 @@ const mockRecords: CheckInRecord[] = [
     date: '2024-02-12',
     checkIn: '08:00',
     checkOut: '17:30',
-    location: 'Edificio Residencial Norte',
+    location: 'Green Tower',
     hoursWorked: 9.5,
   },
   {
@@ -26,7 +26,7 @@ const mockRecords: CheckInRecord[] = [
     date: '2024-02-11',
     checkIn: '08:15',
     checkOut: '17:45',
-    location: 'Centro Comercial Plaza',
+    location: 'Data Center Norte',
     hoursWorked: 9.5,
   },
   {
@@ -34,7 +34,7 @@ const mockRecords: CheckInRecord[] = [
     date: '2024-02-10',
     checkIn: '08:00',
     checkOut: '17:00',
-    location: 'Edificio Residencial Norte',
+    location: 'Parque Industrial Orión',
     hoursWorked: 9,
   },
 ];
@@ -43,7 +43,7 @@ export default function CheckInScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState<string | null>(null);
-  const [currentLocation] = useState('Edificio Residencial Norte');
+  const [currentLocation] = useState('Green Tower');
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
@@ -126,7 +126,7 @@ export default function CheckInScreen() {
       <StatusBar style="dark" />
       
       <View style={styles.header}>
-        <Text style={styles.title}>Jornada Laboral</Text>
+        <Text style={styles.title}>Turno de Instalación</Text>
         <Text style={styles.date}>{formatDate(currentTime)}</Text>
       </View>
 
@@ -144,7 +144,7 @@ export default function CheckInScreen() {
             <View style={styles.statusIcon}>
               <CheckCircle size={24} color="#10B981" />
             </View>
-            <Text style={styles.statusTitle}>Jornada Iniciada</Text>
+            <Text style={styles.statusTitle}>Turno Iniciado</Text>
             <Text style={styles.statusTime}>Desde las {checkInTime}</Text>
             
             <TouchableOpacity 
@@ -154,7 +154,7 @@ export default function CheckInScreen() {
             >
               <Square size={24} color="#FFFFFF" />
               <Text style={styles.actionButtonText}>
-                {isProcessing ? 'Procesando...' : 'Finalizar Jornada'}
+                {isProcessing ? 'Procesando...' : 'Finalizar Turno'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -163,7 +163,7 @@ export default function CheckInScreen() {
             <View style={[styles.statusIcon, styles.statusIconInactive]}>
               <Clock size={24} color="#6B7280" />
             </View>
-            <Text style={styles.statusTitle}>Jornada No Iniciada</Text>
+            <Text style={styles.statusTitle}>Turno No Iniciado</Text>
             <Text style={styles.statusSubtitle}>Presiona para iniciar tu día</Text>
             
             <TouchableOpacity 

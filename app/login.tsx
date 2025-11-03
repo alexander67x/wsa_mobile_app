@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Eye, EyeOff, User, Lock } from 'lucide-react-native';
@@ -12,34 +12,35 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert('Error', 'Por favor ingresa usuario y contraseña');
+      Alert.alert('Error', 'Por favor ingresa usuario y contraseÃ±a');
       return;
     }
 
     setIsLoading(true);
     
     // Simulate API call
-    setTimeout(() => {
+    try {
+      const Auth = await import('@/services/auth');
+      const { token } = await Auth.login(username, password);
+      if (token) router.replace('/(tabs)');
+    } catch (e) {
+      Alert.alert('Error', (e as any)?.message || 'Credenciales inválidas');
+    } finally {
       setIsLoading(false);
-      if (username === 'admin' && password === '123456') {
-        router.replace('/(tabs)');
-      } else {
-        Alert.alert('Error', 'Usuario o contraseña incorrectos');
-      }
-    }, 1500);
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <View style={styles.logoPlaceholder}>
-          <Text style={styles.logoText}>CONSTRUCTION</Text>
-          <Text style={styles.logoSubtext}>PROJECT MANAGER</Text>
+          <Text style={styles.logoText}>SECURITY OPS</Text>
+          <Text style={styles.logoSubtext}>FIELD MANAGER</Text>
         </View>
       </View>
 
       <View style={styles.formContainer}>
-        <Text style={styles.title}>Iniciar Sesión</Text>
+        <Text style={styles.title}>Iniciar SesiÃ³n</Text>
         
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
@@ -60,7 +61,7 @@ export default function LoginScreen() {
             <Lock size={20} color="#6B7280" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Contraseña"
+              placeholder="ContraseÃ±a"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -84,7 +85,7 @@ export default function LoginScreen() {
             onPress={() => setRememberMe(!rememberMe)}
           >
             <View style={[styles.checkboxBox, rememberMe && styles.checkboxChecked]}>
-              {rememberMe && <Text style={styles.checkboxMark}>✓</Text>}
+              {rememberMe && <Text style={styles.checkboxMark}>âœ“</Text>}
             </View>
             <Text style={styles.checkboxLabel}>Recordarme</Text>
           </TouchableOpacity>
@@ -96,18 +97,18 @@ export default function LoginScreen() {
           disabled={isLoading}
         >
           <Text style={styles.loginButtonText}>
-            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            {isLoading ? 'Iniciando sesiÃ³n...' : 'Iniciar SesiÃ³n'}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.forgotPassword}>
-          <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+          <Text style={styles.forgotPasswordText}>Â¿Olvidaste tu contraseÃ±a?</Text>
         </TouchableOpacity>
 
         <View style={styles.credentialsContainer}>
           <Text style={styles.credentialsTitle}>Credenciales de prueba:</Text>
           <Text style={styles.credentialsText}>Usuario: admin</Text>
-          <Text style={styles.credentialsText}>Contraseña:  </Text>
+          <Text style={styles.credentialsText}>ContraseÃ±a:  </Text>
         </View>
       </View>
     </View>
