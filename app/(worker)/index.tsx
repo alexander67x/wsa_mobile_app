@@ -39,9 +39,7 @@ export default function WorkerHome() {
             <View style={styles.statItem}><BarChart3 size={18} color="#2563EB" /><Text style={styles.statValue}>{project.tasks.length}</Text><Text style={styles.statLabel}>Tareas</Text></View>
             <View style={styles.statItem}><Plus size={18} color="#2563EB" /><Text style={styles.statValue}>{project.reports.length}</Text><Text style={styles.statLabel}>Reportes</Text></View>
           </View>
-          <TouchableOpacity style={styles.linkBtn} onPress={() => router.push('/(worker)/team-reports')}>
-            <Text style={styles.linkText}>Ver reportes del equipo</Text>
-          </TouchableOpacity>
+          {/* Botón de reportes del equipo eliminado por redundante (se ven en Kanban) */}
         </View>
 
         <View style={styles.card}>

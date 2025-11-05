@@ -24,7 +24,15 @@ export default function WorkerCreateReport() {
     setTimeout(async () => {
       setIsSubmitting(false);
       const me = getUser();
-      await addCard('En revisión', { id: String(Date.now()), title: description.slice(0, 60), authorId: me?.id, createdAt: new Date().toISOString().slice(0, 10) });
+      await addCard('En revisión', {
+        id: String(Date.now()),
+        title: description.trim().slice(0, 60) || 'Reporte',
+        authorId: me?.id,
+        authorName: me?.name,
+        description,
+        photos: photosCount > 0 ? ['https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?auto=compress&cs=tinysrgb&w=400'] : [],
+        createdAt: new Date().toISOString().slice(0, 10),
+      });
       Alert.alert('Enviado', 'Reporte enviado al supervisor para revisión.', [
         { text: 'OK', onPress: () => router.push('/(worker)/kanban') },
       ]);

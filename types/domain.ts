@@ -79,5 +79,13 @@ export interface TeamMember {
   phone?: string;
 }
 
-export interface KanbanCard { id: Id; title: string; authorId?: Id; createdAt?: string }
+export interface KanbanCard {
+  id: Id;
+  title: string;
+  authorId?: Id;
+  authorName?: string;
+  description?: string;
+  photos?: string[];
+  createdAt?: string;
+}
 export type KanbanBoard = Record<string, KanbanCard[]>;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { KanbanSquare, Plus, X } from 'lucide-react-native';
+import { router } from 'expo-router';
 import * as Kanban from '@/services/kanban';
 import type { KanbanBoard } from '@/types/domain';
 
@@ -48,10 +49,10 @@ export default function WorkerKanban() {
             <ScrollView style={styles.columnBody}>
               {board[column]?.length ? (
                 board[column].map(card => (
-                  <View key={card.id} style={styles.card}>
+                  <TouchableOpacity key={card.id} style={styles.card} onPress={() => router.push({ pathname: '/(worker)/report-detail', params: { cardId: card.id } })}>
                     <Text style={styles.cardTitle}>{card.title}</Text>
-                    <Text style={styles.cardMeta}>{card.createdAt}</Text>
-                  </View>
+                    <Text style={styles.cardMeta}>Autor: {card.authorName || '—'} • {card.createdAt}</Text>
+                  </TouchableOpacity>
                 ))
               ) : (
                 <Text style={styles.empty}>Sin elementos</Text>
