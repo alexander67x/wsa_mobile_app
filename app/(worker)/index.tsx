@@ -39,12 +39,18 @@ export default function WorkerHome() {
             <View style={styles.statItem}><BarChart3 size={18} color="#2563EB" /><Text style={styles.statValue}>{project.tasks.length}</Text><Text style={styles.statLabel}>Tareas</Text></View>
             <View style={styles.statItem}><Plus size={18} color="#2563EB" /><Text style={styles.statValue}>{project.reports.length}</Text><Text style={styles.statLabel}>Reportes</Text></View>
           </View>
+          <TouchableOpacity style={styles.linkBtn} onPress={() => router.push('/(worker)/team-reports')}>
+            <Text style={styles.linkText}>Ver reportes del equipo</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Equipo</Text>
           <Text style={styles.text}>Supervisor: {project.manager}</Text>
           <Text style={styles.text}>Miembros: {project.team}</Text>
+          <TouchableOpacity style={styles.linkBtn} onPress={() => router.push('/(worker)/team')}>
+            <Text style={styles.linkText}>Ver integrantes</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -69,4 +75,3 @@ const styles = StyleSheet.create({
   statLabel: { color: '#6B7280', fontSize: 12 },
   text: { color: '#1F2937' },
 });
-

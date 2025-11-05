@@ -1,23 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { KanbanSquare, Plus, X } from 'lucide-react-native';
+import * as Kanban from '@/services/kanban';
+import type { KanbanBoard } from '@/types/domain';
 
-type ColumnKey = string;
-
-interface Card { id: string; title: string }
-type Board = Record<ColumnKey, Card[]>;
-
-const initialColumns = ['En revisión', 'Aprobado', 'Rechazado', 'Tareas', 'Reenviado'];
+const defaultColumns = ['En revisión', 'Aprobado', 'Rechazado', 'Tareas', 'Reenviado'];
 
 export default function WorkerKanban() {
-  const [board, setBoard] = useState<Board>(() => Object.fromEntries(initialColumns.map(c => [c, [] as Card[]])));
+  const [board, setBoard] = useState<KanbanBoard>({});
   const [newColumn, setNewColumn] = useState('');
 
-  const addColumn = () => {
+  const refresh = () => Kanban.getBoard().then(setBoard);
+  useEffect(() => { refresh(); }, []);
+
+  const addColumn = async () => {
     const name = newColumn.trim();
-    if (!name || board[name]) return;
-    setBoard(prev => ({ ...prev, [name]: [] }));
+    if (!name) return;
+    await Kanban.addColumn(name);
     setNewColumn('');
+    refresh();
   };
 
   return (
@@ -38,14 +39,23 @@ export default function WorkerKanban() {
           <View key={column} style={styles.column}>
             <View style={styles.columnHeader}>
               <Text style={styles.columnTitle}>{column}</Text>
-              {!(initialColumns as string[]).includes(column) && (
+              {!(defaultColumns as string[]).includes(column) && (
                 <TouchableOpacity onPress={() => { const copy={...board}; delete copy[column]; setBoard(copy); }}>
                   <X size={16} color="#6B7280" />
                 </TouchableOpacity>
               )}
             </View>
             <ScrollView style={styles.columnBody}>
-              {board[column].length === 0 && <Text style={styles.empty}>Sin elementos</Text>}
+              {board[column]?.length ? (
+                board[column].map(card => (
+                  <View key={card.id} style={styles.card}>
+                    <Text style={styles.cardTitle}>{card.title}</Text>
+                    <Text style={styles.cardMeta}>{card.createdAt}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.empty}>Sin elementos</Text>
+              )}
             </ScrollView>
           </View>
         ))}
@@ -68,5 +78,7 @@ const styles = StyleSheet.create({
   columnTitle: { fontWeight: '700', color: '#111827' },
   columnBody: { backgroundColor: '#FFFFFF', padding: 12, borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
   empty: { color: '#6B7280', textAlign: 'center' },
+  card: { backgroundColor: '#F3F4F6', borderRadius: 10, padding: 10, marginBottom: 8 },
+  cardTitle: { color: '#111827', fontWeight: '600' },
+  cardMeta: { color: '#6B7280', fontSize: 12 },
 });
-

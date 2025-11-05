@@ -1,10 +1,10 @@
 import { Report, ReportDetail } from '@/types/domain';
 
 export const mockReports: Report[] = [
-  { id: '1', title: 'Instalación de cámaras – Nivel 3', project: 'Green Tower', date: '2024-02-12', type: 'progress', status: 'approved', progress: 40 },
-  { id: '2', title: 'Incidente: pérdida de conectividad PoE', project: 'Data Center Norte', date: '2024-02-10', type: 'incident', status: 'pending' },
-  { id: '3', title: 'Pruebas de calidad de sensores', project: 'Parque Industrial Orión', date: '2024-02-08', type: 'quality', status: 'approved' },
-  { id: '4', title: 'Avance NVR y cableado backbone', project: 'Campus Corporativo Andina', date: '2024-02-06', type: 'progress', status: 'rejected', progress: 20 },
+  { id: '1', title: 'Instalación de cámaras – Nivel 3', project: 'Green Tower', date: '2024-02-12', type: 'progress', status: 'approved', progress: 40, authorId: 'u1', authorName: 'Juan Pérez' },
+  { id: '2', title: 'Incidente: pérdida de conectividad PoE', project: 'Data Center Norte', date: '2024-02-10', type: 'incident', status: 'pending', authorId: 'u3', authorName: 'Luis Mendoza' },
+  { id: '3', title: 'Pruebas de calidad de sensores', project: 'Parque Industrial Orión', date: '2024-02-08', type: 'quality', status: 'approved', authorId: 'u2', authorName: 'Karla García' },
+  { id: '4', title: 'Avance NVR y cableado backbone', project: 'Campus Corporativo Andina', date: '2024-02-06', type: 'progress', status: 'rejected', progress: 20, authorId: 'u3', authorName: 'Luis Mendoza' },
 ];
 
 export const mockReportDetail: ReportDetail = {
@@ -28,4 +28,3 @@ export const mockReportDetail: ReportDetail = {
   approvedDate: '2024-02-13 09:15',
   feedback: 'Buen avance. Validar alimentación PoE en todos los puertos.',
 };
-

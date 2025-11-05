@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, KanbanSquare, FileText, Clock, User } from 'lucide-react-native';
+import { Home, KanbanSquare, FileText, Clock, User, Users } from 'lucide-react-native';
 
 export default function WorkerTabs() {
   return (
@@ -20,9 +20,9 @@ export default function WorkerTabs() {
       <Tabs.Screen name="index" options={{ title: 'Proyecto', tabBarIcon: ({ size, color }) => <Home size={size} color={color} /> }} />
       <Tabs.Screen name="kanban" options={{ title: 'Kanban', tabBarIcon: ({ size, color }) => <KanbanSquare size={size} color={color} /> }} />
       <Tabs.Screen name="create-report" options={{ title: 'Reporte', tabBarIcon: ({ size, color }) => <FileText size={size} color={color} /> }} />
+      <Tabs.Screen name="team" options={{ title: 'Equipo', tabBarIcon: ({ size, color }) => <Users size={size} color={color} /> }} />
       <Tabs.Screen name="checkin" options={{ title: 'Jornada', tabBarIcon: ({ size, color }) => <Clock size={size} color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'Perfil', tabBarIcon: ({ size, color }) => <User size={size} color={color} /> }} />
     </Tabs>
   );
 }
-

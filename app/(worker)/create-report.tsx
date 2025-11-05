@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Save, Camera } from 'lucide-react-native';
+import { addCard } from '@/services/kanban';
+import { getUser } from '@/services/auth';
 import { router } from 'expo-router';
 
 export default function WorkerCreateReport() {
@@ -19,10 +21,12 @@ export default function WorkerCreateReport() {
       return;
     }
     setIsSubmitting(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsSubmitting(false);
+      const me = getUser();
+      await addCard('En revisión', { id: String(Date.now()), title: description.slice(0, 60), authorId: me?.id, createdAt: new Date().toISOString().slice(0, 10) });
       Alert.alert('Enviado', 'Reporte enviado al supervisor para revisión.', [
-        { text: 'OK', onPress: () => router.push('/(worker)') },
+        { text: 'OK', onPress: () => router.push('/(worker)/kanban') },
       ]);
     }, 1200);
   };
@@ -86,4 +90,3 @@ const styles = StyleSheet.create({
   submitBtnDisabled: { opacity: 0.6 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '700' },
 });
-

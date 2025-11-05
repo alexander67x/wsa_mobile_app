@@ -35,6 +35,8 @@ export interface Report {
   type: 'progress' | 'incident' | 'quality';
   status: 'pending' | 'approved' | 'rejected';
   progress?: number;
+  authorId?: Id;
+  authorName?: string;
 }
 
 export interface ReportDetail {
@@ -69,3 +71,13 @@ export interface MaterialRequest {
 
 export interface CatalogItem { id: Id; name: string; unit: string }
 
+export interface TeamMember {
+  id: Id;
+  name: string;
+  role: 'worker' | 'supervisor';
+  email?: string;
+  phone?: string;
+}
+
+export interface KanbanCard { id: Id; title: string; authorId?: Id; createdAt?: string }
+export type KanbanBoard = Record<string, KanbanCard[]>;
