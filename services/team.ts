@@ -3,8 +3,23 @@ import { fetchJson } from '@/lib/http';
 import { TeamMember } from '@/types/domain';
 import { teamMembers } from '@/mocks/team';
 
-export async function listTeam(_projectId: string): Promise<TeamMember[]> {
+interface ApiTeamMember {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export async function listTeam(projectId: string): Promise<TeamMember[]> {
   if (USE_MOCKS) return Promise.resolve(teamMembers);
-  return fetchJson<TeamMember[]>(`/projects/${_projectId}/team`);
+  
+  const apiMembers = await fetchJson<ApiTeamMember[]>(`/projects/${projectId}/team`);
+  
+  return apiMembers.map((m): TeamMember => ({
+    id: m.id,
+    name: m.name,
+    role: (m.role === 'supervisor' ? 'supervisor' : 'worker') as 'worker' | 'supervisor',
+    email: undefined,
+    phone: undefined,
+  }));
 }
 

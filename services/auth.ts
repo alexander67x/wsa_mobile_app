@@ -1,4 +1,5 @@
 import { USE_MOCKS } from '@/lib/config';
+import { fetchJson } from '@/lib/http';
 
 let memoryToken: string | null = null;
 let memoryRole: 'supervisor' | 'worker' | null = null;
@@ -21,11 +22,69 @@ export async function login(username: string, password: string): Promise<{ token
     }
     throw new Error('Credenciales inválidas');
   }
-  // Replace with real HTTP call when connecting
-  throw new Error('HTTP login no implementado');
+
+  // Real API call - API expects 'email' but we accept username/email
+  // Try username as email directly first, then try with @example.com if it doesn't contain @
+  let email = username;
+  if (!username.includes('@')) {
+    email = `${username}@example.com`;
+  }
+  
+  try {
+    const response = await fetchJson<{ token: string; role: string; user: { id: string; name: string } }, { email: string; password: string }>(
+      '/auth/login',
+      {
+        method: 'POST',
+        body: { email, password },
+      }
+    );
+
+    // API returns role as string, we need to map it to our types
+    const role = (response.role === 'supervisor' ? 'supervisor' : 'worker') as 'supervisor' | 'worker';
+    
+    memoryToken = response.token;
+    memoryRole = role;
+    memoryUser = { id: response.user.id, name: response.user.name, role };
+    
+    return { token: response.token, role, user: { id: response.user.id, name: response.user.name } };
+  } catch (error: any) {
+    // If first attempt failed and we added @example.com, try with username as-is
+    if (email !== username) {
+      try {
+        const response = await fetchJson<{ token: string; role: string; user: { id: string; name: string } }, { email: string; password: string }>(
+          '/auth/login',
+          {
+            method: 'POST',
+            body: { email: username, password },
+          }
+        );
+
+        const role = (response.role === 'supervisor' ? 'supervisor' : 'worker') as 'supervisor' | 'worker';
+        
+        memoryToken = response.token;
+        memoryRole = role;
+        memoryUser = { id: response.user.id, name: response.user.name, role };
+        
+        return { token: response.token, role, user: { id: response.user.id, name: response.user.name } };
+      } catch (e) {
+        // Fall through to throw original error
+      }
+    }
+    throw new Error(error?.message || 'Credenciales inválidas');
+  }
 }
 
 export async function logout(): Promise<void> {
+  if (!USE_MOCKS && memoryToken) {
+    try {
+      await fetchJson('/auth/logout', {
+        method: 'POST',
+        token: memoryToken,
+      });
+    } catch (error) {
+      // Ignore logout errors, clear local state anyway
+    }
+  }
   memoryToken = null;
   memoryRole = null;
   memoryUser = null;

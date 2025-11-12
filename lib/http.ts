@@ -11,13 +11,26 @@ export interface FetchOptions<T> {
 
 export async function fetchJson<R = unknown, B = unknown>(path: string, opts: FetchOptions<B> = {}): Promise<R> {
   const { method = 'GET', body, token, headers = {} } = opts;
+  
+  // Auto-inject token from auth service if not provided
+  let authToken = token;
+  if (!authToken && path !== '/auth/login') {
+    try {
+      const { getToken } = await import('@/services/auth');
+      authToken = getToken();
+    } catch {
+      // Ignore if auth service not available
+    }
+  }
+  
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
 
   const res = await fetch(url, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'Accept': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...headers,
     },
     body: body ? JSON.stringify(body) : undefined,

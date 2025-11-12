@@ -3,18 +3,119 @@ import { fetchJson } from '@/lib/http';
 import { Report, ReportDetail } from '@/types/domain';
 import { mockReports, mockReportDetail } from '@/mocks/reports';
 
-export async function listReports(): Promise<Report[]> {
+interface ApiReport {
+  id: string;
+  projectId: string;
+  taskId: string | null;
+  taskTitle: string | null;
+  title: string;
+  project: string | null;
+  date: string | null;
+  type: string;
+  status: 'pending' | 'approved' | 'rejected';
+  progress: number | null;
+  authorId: string | null;
+  authorName: string | null;
+}
+
+interface ApiReportDetail {
+  id: string;
+  projectId: string;
+  taskId: string | null;
+  taskTitle: string | null;
+  taskDescription: string | null;
+  taskStatus: string | null;
+  title: string;
+  project: string | null;
+  type: string;
+  status: 'pending' | 'approved' | 'rejected';
+  authorId: string | null;
+  author: string | null;
+  date: string | null;
+  location: string | null;
+  description: string;
+  observations: string | null;
+  images: string[];
+  approvedBy: string | null;
+  approvedDate: string | null;
+  feedback: string | null;
+  difficulties: string | null;
+  materialsUsed: string | null;
+}
+
+export async function listReports(projectId?: string, taskId?: string): Promise<(Report & { taskId?: string; taskTitle?: string })[]> {
   if (USE_MOCKS) return Promise.resolve(mockReports);
-  return fetchJson<Report[]>('/reports');
+  
+  const params = new URLSearchParams();
+  if (projectId) params.append('projectId', projectId);
+  if (taskId) params.append('taskId', taskId);
+  const queryString = params.toString();
+  const url = queryString ? `/reports?${queryString}` : '/reports';
+  
+  const apiReports = await fetchJson<ApiReport[]>(url);
+  
+  return apiReports.map((r): Report & { taskId?: string; taskTitle?: string } => ({
+    id: r.id,
+    title: r.title,
+    project: r.project || 'Sin proyecto',
+    date: r.date || '',
+    type: (r.type === 'progress' ? 'progress' : r.type === 'incident' ? 'incident' : 'quality') as 'progress' | 'incident' | 'quality',
+    status: r.status,
+    progress: r.progress || undefined,
+    authorId: r.authorId || undefined,
+    authorName: r.authorName || undefined,
+    taskId: r.taskId || undefined,
+    taskTitle: r.taskTitle || undefined,
+  }));
 }
 
-export async function getReport(id: string): Promise<ReportDetail> {
+export async function getReport(id: string): Promise<ReportDetail & { taskId?: string; taskTitle?: string; taskDescription?: string; taskStatus?: string }> {
   if (USE_MOCKS) return Promise.resolve(mockReportDetail);
-  return fetchJson<ReportDetail>(`/reports/${id}`);
+  
+  const apiReport = await fetchJson<ApiReportDetail>(`/reports/${id}`);
+  
+  return {
+    id: apiReport.id,
+    title: apiReport.title,
+    project: apiReport.project || 'Sin proyecto',
+    type: (apiReport.type === 'progress' ? 'progress' : apiReport.type === 'incident' ? 'incident' : 'quality') as 'progress' | 'incident' | 'quality',
+    status: apiReport.status,
+    progress: undefined,
+    author: apiReport.author || 'Desconocido',
+    date: apiReport.date || '',
+    location: apiReport.location || '',
+    description: apiReport.description,
+    observations: apiReport.observations || undefined,
+    images: apiReport.images || [],
+    approvedBy: apiReport.approvedBy || undefined,
+    approvedDate: apiReport.approvedDate || undefined,
+    feedback: apiReport.feedback || undefined,
+    taskId: apiReport.taskId || undefined,
+    taskTitle: apiReport.taskTitle || undefined,
+    taskDescription: apiReport.taskDescription || undefined,
+    taskStatus: apiReport.taskStatus || undefined,
+  };
 }
 
-export async function createReport(_payload: any): Promise<{ id: string }> {
+export async function createReport(payload: {
+  projectId: string;
+  taskId: string;
+  authorId: string;
+  title: string;
+  description: string;
+  reportDate?: string;
+  difficulties?: string;
+  materialsUsed?: string;
+  observations?: string;
+  attachments?: number[];
+}): Promise<{ id: string }> {
   if (USE_MOCKS) return Promise.resolve({ id: 'mock' });
-  return fetchJson<{ id: string }, any>('/reports', { method: 'POST', body: _payload });
+  
+  const response = await fetchJson<{ id: string; report: ApiReport }, typeof payload>(
+    '/reports',
+    { method: 'POST', body: payload }
+  );
+  
+  return { id: response.id };
 }
 

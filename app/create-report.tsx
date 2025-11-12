@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, FileText, Camera, MapPin, Save } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { getProject } from '@/services/projects';
+import { createReport } from '@/services/reports';
+import { getUser } from '@/services/auth';
+import type { ProjectDetail } from '@/types/domain';
 
 const reportTypes = [
   { key: 'progress', label: 'Avance de Instalación', color: '#2563EB' },
@@ -10,45 +14,84 @@ const reportTypes = [
   { key: 'quality', label: 'Pruebas y Calidad', color: '#10B981' },
 ];
 
-const projects = [
-  { id: '1', name: 'Green Tower' },
-  { id: '2', name: 'Data Center Norte' },
-  { id: '3', name: 'Parque Industrial Orión' },
-  { id: '4', name: 'Campus Corporativo Andina' },
-];
-
 export default function CreateReportScreen() {
-  const [selectedProject, setSelectedProject] = useState('');
-  const [reportType, setReportType] = useState('');
+  const { projectId, taskId } = useLocalSearchParams();
+  const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [task, setTask] = useState<any>(null);
+  const [reportType, setReportType] = useState('progress');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [progress, setProgress] = useState('');
+  const [difficulties, setDifficulties] = useState('');
+  const [materialsUsed, setMaterialsUsed] = useState('');
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (projectId) {
+      getProject(String(projectId))
+        .then((projectData) => {
+          setProject(projectData);
+          if (taskId) {
+            const foundTask = projectData.tasks.find(t => t.id === String(taskId));
+            if (foundTask) {
+              setTask(foundTask);
+              // Pre-llenar el título con el nombre de la tarea
+              setTitle(`Reporte de avance: ${foundTask.title}`);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Error loading project:', error);
+          Alert.alert('Error', 'No se pudo cargar la información del proyecto');
+        })
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
+    }
+  }, [projectId, taskId]);
 
   const handleSave = async () => {
-    if (!selectedProject || !reportType || !title || !description) {
+    if (!projectId || !taskId) {
+      Alert.alert('Error', 'Faltan parámetros necesarios (proyecto o tarea)');
+      return;
+    }
+
+    if (!title || !description) {
       Alert.alert('Error', 'Por favor completa todos los campos obligatorios');
       return;
     }
 
-    if (reportType === 'progress' && (!progress || isNaN(Number(progress)))) {
-      Alert.alert('Error', 'Por favor ingresa un porcentaje de avance válido');
+    const user = getUser();
+    if (!user || !user.id) {
+      Alert.alert('Error', 'No se pudo obtener la información del usuario');
       return;
     }
 
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await createReport({
+        projectId: String(projectId),
+        taskId: String(taskId),
+        authorId: user.id,
+        title,
+        description,
+        difficulties: difficulties || undefined,
+        materialsUsed: materialsUsed || undefined,
+        observations: observations || undefined,
+      });
+
       Alert.alert(
         'Éxito',
         'Reporte guardado correctamente',
         [
           {
-            text: 'Agregar Evidencias',
-            onPress: () => router.push('/attach-evidence'),
+            text: 'Ver Tarea',
+            onPress: () => router.push({
+              pathname: '/task-detail',
+              params: { projectId: String(projectId), taskId: String(taskId) }
+            }),
           },
           {
             text: 'Continuar',
@@ -57,7 +100,12 @@ export default function CreateReportScreen() {
           },
         ]
       );
-    }, 2000);
+    } catch (error: any) {
+      console.error('Error creating report:', error);
+      Alert.alert('Error', error?.message || 'No se pudo crear el reporte');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -76,117 +124,106 @@ export default function CreateReportScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Información Básica</Text>
-          
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Proyecto <Text style={styles.required}>*</Text></Text>
-            <View style={styles.pickerContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {projects.map(project => (
-                  <TouchableOpacity
-                    key={project.id}
-                    style={[
-                      styles.pickerOption,
-                      selectedProject === project.id && styles.pickerOptionActive
-                    ]}
-                    onPress={() => setSelectedProject(project.id)}
-                  >
-                    <Text style={[
-                      styles.pickerOptionText,
-                      selectedProject === project.id && styles.pickerOptionTextActive
-                    ]}>
-                      {project.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Cargando información...</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Información Básica</Text>
+              
+              {project && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Proyecto</Text>
+                  <View style={styles.infoBox}>
+                    <Text style={styles.infoText}>{project.name}</Text>
+                  </View>
+                </View>
+              )}
+
+              {task && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Tarea</Text>
+                  <View style={styles.infoBox}>
+                    <Text style={styles.infoText}>{task.title}</Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Título del Reporte <Text style={styles.required}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ingresa el título del reporte"
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
             </View>
-          </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Tipo de Reporte <Text style={styles.required}>*</Text></Text>
-            <View style={styles.typeContainer}>
-              {reportTypes.map(type => (
-                <TouchableOpacity
-                  key={type.key}
-                  style={[
-                    styles.typeOption,
-                    { borderColor: type.color },
-                    reportType === type.key && { backgroundColor: type.color + '20' }
-                  ]}
-                  onPress={() => setReportType(type.key)}
-                >
-                  <View style={[styles.typeIndicator, { backgroundColor: type.color }]} />
-                  <Text style={[
-                    styles.typeText,
-                    { color: reportType === type.key ? type.color : '#6B7280' }
-                  ]}>
-                    {type.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Detalles del Reporte</Text>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Describe el avance, incidencias o detalles del trabajo realizado..."
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Dificultades Encontradas</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Describe cualquier dificultad o problema encontrado durante el trabajo..."
+                  value={difficulties}
+                  onChangeText={setDifficulties}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Materiales Utilizados</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Lista los materiales utilizados en esta tarea..."
+                  value={materialsUsed}
+                  onChangeText={setMaterialsUsed}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Observaciones Adicionales</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Observaciones, recomendaciones o comentarios adicionales..."
+                  value={observations}
+                  onChangeText={setObservations}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
             </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Título del Reporte <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ingresa el título del reporte"
-              value={title}
-              onChangeText={setTitle}
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          {reportType === 'progress' && (
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Porcentaje de Avance <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0-100"
-                value={progress}
-                onChangeText={setProgress}
-                keyboardType="numeric"
-                maxLength={3}
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-          )}
-        </View>
-
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Detalles</Text>
-          
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Describe los detalles del reporte..."
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Observaciones Adicionales</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Observaciones, recomendaciones o comentarios adicionales..."
-              value={observations}
-              onChangeText={setObservations}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-        </View>
+          </>
+        )}
 
         <View style={styles.actionSection}>
           <TouchableOpacity style={styles.evidenceButton}>
@@ -287,6 +324,27 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#1F2937',
+  },
+  infoBox: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  infoText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
   },
   textArea: {
     minHeight: 100,

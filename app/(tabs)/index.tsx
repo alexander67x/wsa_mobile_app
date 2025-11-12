@@ -21,9 +21,17 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    listProjects().then(setProjects).catch(() => setProjects([]));
+    setIsLoading(true);
+    listProjects()
+      .then(setProjects)
+      .catch((error) => {
+        console.error('Error loading projects:', error);
+        setProjects([]);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const filteredProjects = projects.filter(project => {
@@ -103,7 +111,20 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.projectsList} showsVerticalScrollIndicator={false}>
-        {filteredProjects.map(project => (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Cargando proyectos...</Text>
+          </View>
+        ) : filteredProjects.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {projects.length === 0 
+                ? 'No hay proyectos disponibles' 
+                : 'No se encontraron proyectos con los filtros seleccionados'}
+            </Text>
+          </View>
+        ) : (
+          filteredProjects.map(project => (
           <TouchableOpacity
             key={project.id}
             style={styles.projectCard}
@@ -154,7 +175,8 @@ export default function HomeScreen() {
               </View>
             </View>
           </TouchableOpacity>
-        ))}
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -197,4 +219,8 @@ const styles = StyleSheet.create({
   projectStats: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   statItem: { flexDirection: 'row', alignItems: 'center' },
   statText: { marginLeft: 6, color: '#6B7280' },
+  loadingContainer: { padding: 40, alignItems: 'center' },
+  loadingText: { fontSize: 16, color: '#6B7280' },
+  emptyContainer: { padding: 40, alignItems: 'center' },
+  emptyText: { fontSize: 16, color: '#6B7280', textAlign: 'center' },
 });

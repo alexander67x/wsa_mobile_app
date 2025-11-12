@@ -81,62 +81,6 @@ export default function ProjectDetailScreen() {
     return status;
   };
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'tasks':
-        return mockTabData.tasks.map(task => (
-          <View key={task.id} style={styles.listItem}>
-            <View style={styles.listItemHeader}>
-              <Text style={styles.listItemTitle}>{task.title}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
-                <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>
-                  {getStatusText(task.status, 'task')}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.listItemSubtitle}>Asignado a: {task.assignee}</Text>
-            <Text style={styles.listItemDate}>Vence: {task.dueDate}</Text>
-          </View>
-        ));
-
-      case 'reports':
-        return mockTabData.reports.map(report => (
-          <TouchableOpacity
-            key={report.id}
-            style={styles.listItem}
-            onPress={() => router.push({ pathname: '/report-detail', params: { reportId: report.id } })}
-          >
-            <View style={styles.listItemHeader}>
-              <Text style={styles.listItemTitle}>{report.title}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(report.status) + '20' }]}>
-                <Text style={[styles.statusText, { color: getStatusColor(report.status) }]}>
-                  {getStatusText(report.status, 'report')}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.listItemSubtitle}>Tipo: {report.type}</Text>
-            <Text style={styles.listItemDate}>{report.date}</Text>
-          </TouchableOpacity>
-        ));
-
-      case 'materials':
-        return mockTabData.materials.map(material => (
-          <View key={material.id} style={styles.listItem}>
-            <View style={styles.listItemHeader}>
-              <Text style={styles.listItemTitle}>{material.name}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(material.status) + '20' }]}>
-                <Text style={[styles.statusText, { color: getStatusColor(material.status) }]}>
-                  {getStatusText(material.status, 'material')}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.listItemSubtitle}>
-              Cantidad: {material.quantity} {material.unit}
-            </Text>
-          </View>
-        ));
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -211,7 +155,14 @@ export default function ProjectDetailScreen() {
             switch (activeTab) {
               case 'tasks':
                 return data.tasks.map(task => (
-                  <View key={task.id} style={styles.listItem}>
+                  <TouchableOpacity
+                    key={task.id}
+                    style={styles.listItem}
+                    onPress={() => router.push({
+                      pathname: '/task-detail',
+                      params: { projectId: String(projectId), taskId: task.id }
+                    })}
+                  >
                     <View style={styles.listItemHeader}>
                       <Text style={styles.listItemTitle}>{task.title}</Text>
                       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
@@ -220,9 +171,9 @@ export default function ProjectDetailScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.listItemSubtitle}>Asignado a: {task.assignee}</Text>
-                    <Text style={styles.listItemDate}>Vence: {task.dueDate}</Text>
-                  </View>
+                    <Text style={styles.listItemSubtitle}>Asignado a: {task.assignee || 'Sin asignar'}</Text>
+                    <Text style={styles.listItemDate}>Vence: {task.dueDate || 'Sin fecha'}</Text>
+                  </TouchableOpacity>
                 ));
               case 'reports':
                 return data.reports.map(report => (
@@ -258,10 +209,6 @@ export default function ProjectDetailScreen() {
         </ScrollView>
 
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/create-report')}>
-            <Plus size={20} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Crear Reporte</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} onPress={() => router.push('/kanban')}>
             <FileText size={20} color="#2563EB" />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>Ver Kanban</Text>
