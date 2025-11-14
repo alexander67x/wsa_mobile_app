@@ -32,8 +32,14 @@ export default function RequestMaterialScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    listCatalog().then(items => { materialsStatic = items; setSelectedMaterial(items[0]?.id || ''); }).catch(() => {});
-  }, []);
+    // Load catalog when a project is selected
+    if (selectedProject) {
+      listCatalog(selectedProject).then(items => { 
+        materialsStatic = items; 
+        setSelectedMaterial(items[0]?.id || ''); 
+      }).catch(() => {});
+    }
+  }, [selectedProject]);
 
   const addMaterialRequest = () => {
     if (!selectedMaterial || !quantity || isNaN(Number(quantity))) {

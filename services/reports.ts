@@ -97,10 +97,24 @@ export async function getReport(id: string): Promise<ReportDetail & { taskId?: s
   };
 }
 
+export interface ReportImage {
+  url: string;
+  latitude: number;
+  longitude: number;
+  takenAt?: string;
+}
+
+export interface ReportMaterial {
+  materialId: number | string;
+  quantity: number;
+  unit: string;
+  observations?: string;
+}
+
 export async function createReport(payload: {
   projectId: string;
-  taskId: string;
-  authorId: string;
+  taskId: string | number;
+  authorId: string | number;
   title: string;
   description: string;
   reportDate?: string;
@@ -108,6 +122,8 @@ export async function createReport(payload: {
   materialsUsed?: string;
   observations?: string;
   attachments?: number[];
+  images?: ReportImage[];
+  materials?: ReportMaterial[];
 }): Promise<{ id: string }> {
   if (USE_MOCKS) return Promise.resolve({ id: 'mock' });
   

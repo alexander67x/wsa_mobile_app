@@ -71,3 +71,45 @@ export async function getProject(id: string): Promise<ProjectDetail> {
   };
 }
 
+export interface ProjectStockMaterial {
+  id: string;
+  materialId: string;
+  code: string;
+  name: string;
+  unit: string;
+  available: number;
+  reserved: number;
+  availableReal: number;
+  minAlert: number;
+  location?: string;
+  unitPrice: number;
+  needsRestock: boolean;
+}
+
+export interface ProjectStock {
+  warehouse: {
+    id: string;
+    code: string;
+    name: string;
+    address?: string;
+    city?: string;
+  } | null;
+  materials: ProjectStockMaterial[];
+  totalMaterials: number;
+  message?: string;
+}
+
+export async function getProjectStock(projectId: string): Promise<ProjectStock> {
+  if (USE_MOCKS) {
+    return {
+      warehouse: null,
+      materials: [],
+      totalMaterials: 0,
+      message: 'Mock mode - no stock data',
+    };
+  }
+  
+  const apiStock = await fetchJson<ProjectStock>(`/projects/${projectId}/stock`);
+  return apiStock;
+}
+

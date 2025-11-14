@@ -29,10 +29,16 @@ export async function listMaterialRequests(): Promise<MaterialRequest[]> {
   }));
 }
 
-export async function listCatalog(): Promise<CatalogItem[]> {
+export async function listCatalog(projectId?: string): Promise<CatalogItem[]> {
   if (USE_MOCKS) return Promise.resolve(materialCatalog);
   
-  const apiCatalog = await fetchJson<ApiCatalogItem[]>('/materials/catalog');
+  // Build URL with projectId as query parameter if provided
+  let url = '/materials/catalog';
+  if (projectId) {
+    url += `?projectId=${encodeURIComponent(projectId)}`;
+  }
+  
+  const apiCatalog = await fetchJson<ApiCatalogItem[]>(url);
   
   return apiCatalog.map((item): CatalogItem => ({
     id: String(item.id),
