@@ -1,161 +1,226 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
 import { router } from 'expo-router';
-import { Plus, Package, Clock, CircleCheck as CheckCircle, Circle as XCircle, Calendar } from 'lucide-react-native';
-import { listMaterialRequests } from '@/services/materials';
-import type { MaterialRequest } from '@/types/domain';
+import { Search, ArrowUpDown, Package } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 
-export default function MaterialsScreen() {
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [requests, setRequests] = useState<MaterialRequest[]>([]);
+import * as MaterialsService from '@/services/materials';
+import type { MaterialRequest } from '@/types/domain';
+
+type InventoryRow = {
+  id: string;
+  code: string;
+  name: string;
+  subgroup: string;
+  unit: string;
+  minStock: number;
+  maxStock: number;
+  currentStock: number;
+  warehouse: string;
+  warehousesCount: number;
+  critical: 'critical' | 'ok';
+  active: boolean;
+};
+
+const listMaterialInventory =
+  (MaterialsService as any).listMaterialInventory as
+    | (() => Promise<InventoryRow[]>)
+    | undefined;
+
+const convertRequestsToInventory = (requests: MaterialRequest[]): InventoryRow[] =>
+  requests.map((request, index) => ({
+    id: request.id || `req-${index}`,
+    code: `REQ-${(request.id || index + 1).toString().padStart(3, '0')}`,
+    name: request.materialName,
+    subgroup: request.projectName,
+    unit: request.unit || 'unidad',
+    minStock: Math.max(1, Math.floor(request.quantity / 2)),
+    maxStock: Math.max(request.quantity, Math.floor(request.quantity * 1.5)),
+    currentStock: request.quantity,
+    warehouse: request.projectName,
+    warehousesCount: 1,
+    critical: request.status === 'rejected' ? 'critical' : 'ok',
+    active: request.status !== 'rejected',
+  }));
+
+export default function MaterialsInventoryScreen() {
+  const [items, setItems] = useState<InventoryRow[]>([]);
+  const [search, setSearch] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    listMaterialRequests().then(setRequests).catch(() => setRequests([]));
+    let mounted = true;
+
+    const load = async () => {
+      try {
+        if (typeof listMaterialInventory === 'function') {
+          const data = await listMaterialInventory();
+          if (mounted) setItems(data);
+        } else {
+          const requests = await MaterialsService.listMaterialRequests();
+          if (mounted) setItems(convertRequestsToInventory(requests));
+        }
+      } catch {
+        if (mounted) setItems([]);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const filteredRequests = requests.filter(request => {
-    if (activeFilter === 'all') return true;
-    return request.status === (activeFilter as any);
-  });
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter(item =>
+      `${item.code} ${item.name} ${item.subgroup} ${item.warehouse}`.toLowerCase().includes(term)
+    );
+  }, [items, search]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered': return '#10B981';
-      case 'approved': return '#3B82F6';
-      case 'pending': return '#F59E0B';
-      case 'rejected': return '#EF4444';
-      default: return '#6B7280';
-    }
-  };
+  const renderCriticalBadge = (critical: InventoryRow['critical']) => (
+    <View
+      style={[
+        styles.criticalBadge,
+        critical === 'critical' ? styles.criticalDanger : styles.criticalOk,
+      ]}
+    >
+      <Text
+        style={[
+          styles.badgeText,
+          critical === 'critical' ? styles.badgeTextDanger : styles.badgeTextOk,
+        ]}
+      >
+        {critical === 'critical' ? 'Crítico' : 'Sin crítico'}
+      </Text>
+    </View>
+  );
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered': return <CheckCircle size={16} color="#10B981" />;
-      case 'approved': return <Package size={16} color="#3B82F6" />;
-      case 'pending': return <Clock size={16} color="#F59E0B" />;
-      case 'rejected': return <XCircle size={16} color="#EF4444" />;
-      default: return <Clock size={16} color="#6B7280" />;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'Entregado';
-      case 'approved': return 'Aprobado';
-      case 'pending': return 'Pendiente';
-      case 'rejected': return 'Rechazado';
-      default: return 'Desconocido';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return '#EF4444';
-      case 'medium': return '#F59E0B';
-      case 'low': return '#6B7280';
-      default: return '#6B7280';
-    }
-  };
-
-  const getPriorityText = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'Alta';
-      case 'medium': return 'Media';
-      case 'low': return 'Baja';
-      default: return 'Normal';
-    }
-  };
+  const renderActiveBadge = (active: boolean) => (
+    <View style={[styles.activeBadge, active ? styles.activeOn : styles.activeOff]}>
+      <Text style={[styles.badgeText, active ? styles.badgeTextOk : styles.badgeTextDanger]}>
+        {active ? 'Activo' : 'Inactivo'}
+      </Text>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
 
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>Solicitudes de Equipos de Seguridad</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => router.push('/request-material')}
-          >
-            <Plus size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.title}>Materiales</Text>
+          <Text style={styles.subtitle}>
+            Inventario consolidado por proyectos y almacenes
+          </Text>
         </View>
+        <TouchableOpacity
+          style={styles.requestButton}
+          onPress={() => router.push('/material-requests')}
+        >
+          <Package size={18} color="#111827" />
+          <Text style={styles.requestButtonText}>Solicitud de Material</Text>
+        </TouchableOpacity>
+      </View>
 
-        <View style={styles.filterContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {[
-              { key: 'all', label: 'Todos', count: requests.length },
-              { key: 'pending', label: 'Pendientes', count: requests.filter(r => r.status === 'pending').length },
-              { key: 'approved', label: 'Aprobados', count: requests.filter(r => r.status === 'approved').length },
-              { key: 'delivered', label: 'Entregados', count: requests.filter(r => r.status === 'delivered').length },
-              { key: 'rejected', label: 'Rechazados', count: requests.filter(r => r.status === 'rejected').length },
-            ].map(filter => (
-              <TouchableOpacity
-                key={filter.key}
-                style={[
-                  styles.filterButton,
-                  activeFilter === filter.key && styles.filterButtonActive
-                ]}
-                onPress={() => setActiveFilter(filter.key)}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  activeFilter === filter.key && styles.filterButtonTextActive,
-                ]}>
-                  {filter.label} ({filter.count})
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+      <View style={styles.toolbar}>
+        <View style={styles.searchBox}>
+          <Search size={18} color="#9CA3AF" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por código, producto o almacén"
+            placeholderTextColor="#9CA3AF"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+          />
+        </View>
+        <View style={styles.metaInfo}>
+          <ArrowUpDown size={16} color="#6B7280" />
+          <Text style={styles.metaInfoText}>{filteredItems.length} materiales</Text>
         </View>
       </View>
 
-      <ScrollView style={styles.requestsList} showsVerticalScrollIndicator={false}>
-        {filteredRequests.map(request => (
-          <View key={request.id} style={styles.requestCard}>
-            <View style={styles.requestHeader}>
-              <View style={styles.materialInfo}>
-                <Text style={styles.materialName}>{request.materialName}</Text>
-                <Text style={styles.projectName}>{request.projectName}</Text>
-              </View>
-              <View style={styles.statusBadge}>
-                {getStatusIcon(request.status)}
-                <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
-                  {getStatusText(request.status)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.quantityContainer}>
-              <View style={styles.quantityInfo}>
-                <Package size={16} color="#6B7280" />
-                <Text style={styles.quantityText}>
-                  {request.quantity} {request.unit}
-                </Text>
-              </View>
-              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(request.priority) + '20' }]}>
-                <Text style={[styles.priorityText, { color: getPriorityColor(request.priority) }]}>
-                  {getPriorityText(request.priority)}
-                </Text>
-              </View>
-            </View>
-
-            {request.observations && (
-              <View style={styles.observationsContainer}>
-                <Text style={styles.observationsLabel}>Observaciones:</Text>
-                <Text style={styles.observationsText}>{request.observations}</Text>
-              </View>
-            )}
-
-            <View style={styles.requestFooter}>
-              <View style={styles.dateContainer}>
-                <Calendar size={16} color="#6B7280" />
-                <Text style={styles.dateText}>Solicitado: {request.requestDate}</Text>
-              </View>
-            </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tableWrapper}>
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.headerCell, styles.codeCell]}>Código</Text>
+            <Text style={[styles.headerCell, styles.nameCell]}>Nombre del producto</Text>
+            <Text style={[styles.headerCell, styles.subgroupCell]}>Subgrupo</Text>
+            <Text style={[styles.headerCell, styles.unitCell]}>Unidad</Text>
+            <Text style={[styles.headerCell, styles.stockCell, styles.stockHeader]}>Stock mín.</Text>
+            <Text style={[styles.headerCell, styles.stockCell, styles.stockHeader]}>Máx. stock</Text>
+            <Text style={[styles.headerCell, styles.warehouseCell]}>Almacén / Proyecto</Text>
+            <Text style={[styles.headerCell, styles.criticalCell]}>Crítica</Text>
+            <Text style={[styles.headerCell, styles.activeCell]}>Activo</Text>
           </View>
-        ))}
+
+          {isLoading ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color="#2563EB" />
+              <Text style={styles.loadingText}>Cargando inventario...</Text>
+            </View>
+          ) : filteredItems.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Sin resultados</Text>
+              <Text style={styles.emptySubtitle}>
+                No encontramos materiales que coincidan con tu búsqueda.
+              </Text>
+            </View>
+          ) : (
+            filteredItems.map(item => (
+              <View key={item.id} style={styles.tableRow}>
+                <View style={[styles.cellContainer, styles.codeCell]}>
+                  <Text style={styles.cellText}>{item.code}</Text>
+                </View>
+                <View style={[styles.cellContainer, styles.nameCell]}>
+                  <Text style={styles.productName}>{item.name}</Text>
+                  <Text style={styles.productInfo}>{item.currentStock} unidades en stock</Text>
+                </View>
+                <View style={[styles.cellContainer, styles.subgroupCell]}>
+                  <Text style={styles.cellText}>{item.subgroup}</Text>
+                </View>
+                <View style={[styles.cellContainer, styles.unitCell]}>
+                  <View style={styles.unitBadge}>
+                    <Text style={styles.badgeText}>{item.unit}</Text>
+                  </View>
+                </View>
+                <View style={[styles.cellContainer, styles.stockCell, styles.alignCenter]}>
+                  <Text style={styles.cellText}>{item.minStock}</Text>
+                </View>
+                <View style={[styles.cellContainer, styles.stockCell, styles.alignCenter]}>
+                  <Text style={styles.cellText}>{item.maxStock}</Text>
+                </View>
+                <View style={[styles.cellContainer, styles.warehouseCell]}>
+                  <Text style={styles.warehouseTitle}>{item.warehouse}</Text>
+                  <View style={styles.warehouseMeta}>
+                    <Text style={styles.warehouseMetaText}>
+                      {item.warehousesCount} almacén{item.warehousesCount !== 1 ? 'es' : ''}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.cellContainer, styles.criticalCell]}>
+                  {renderCriticalBadge(item.critical)}
+                </View>
+                <View style={[styles.cellContainer, styles.activeCell]}>
+                  {renderActiveBadge(item.active)}
+                </View>
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -164,155 +229,229 @@ export default function MaterialsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 16,
+    paddingTop: 32,
   },
   header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  headerTextGroup: {
+    flex: 1,
+    marginRight: 12,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1F2937',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#F9FAFB',
   },
-  addButton: {
-    backgroundColor: '#2563EB',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  subtitle: {
+    marginTop: 6,
+    color: '#CBD5F5',
+  },
+  requestButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FCD34D',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  requestButtonText: {
+    fontWeight: '600',
+    color: '#111827',
+    marginLeft: 8,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flex: 1,
+  },
+  searchInput: {
+    marginLeft: 8,
+    color: '#F3F4F6',
+    flex: 1,
+  },
+  metaInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1F2937',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginLeft: 12,
+  },
+  metaInfoText: {
+    marginLeft: 6,
+    color: '#D1D5DB',
+    fontSize: 13,
+  },
+  tableWrapper: {
+    flex: 1,
+  },
+  table: {
+    minWidth: 900,
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    padding: 12,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1F2937',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1F2937',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 32,
     justifyContent: 'center',
   },
-  filterContainer: {
-    marginBottom: 8,
+  loadingText: {
+    marginLeft: 12,
+    color: '#D1D5DB',
   },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
   },
-  filterButtonActive: {
-    backgroundColor: '#2563EB',
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  filterButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  requestsList: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  requestCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  requestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  materialInfo: {
-    flex: 1,
-  },
-  materialName: {
-    fontSize: 18,
+  emptyTitle: {
+    color: '#E5E7EB',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
   },
-  projectName: {
-    fontSize: 14,
-    color: '#6B7280',
+  emptySubtitle: {
+    color: '#9CA3AF',
     marginTop: 4,
+    textAlign: 'center',
   },
-  statusBadge: {
-    flexDirection: 'row',
+  headerCell: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  stockHeader: {
+    textAlign: 'center',
+  },
+  cellContainer: {
+    justifyContent: 'center',
+    paddingRight: 16,
+  },
+  cellText: {
+    color: '#E5E7EB',
+  },
+  alignCenter: {
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
   },
-  statusText: {
-    marginLeft: 6,
+  codeCell: {
+    flex: 1,
+  },
+  nameCell: {
+    flex: 3,
+  },
+  subgroupCell: {
+    flex: 2,
+  },
+  unitCell: {
+    flex: 1,
+  },
+  stockCell: {
+    flex: 1,
+  },
+  warehouseCell: {
+    flex: 3,
+  },
+  criticalCell: {
+    flex: 1.2,
+  },
+  activeCell: {
+    flex: 1,
+  },
+  productName: {
+    color: '#F3F4F6',
+    fontWeight: '600',
+  },
+  productInfo: {
+    marginTop: 4,
+    color: '#9CA3AF',
+    fontSize: 12,
+  },
+  unitBadge: {
+    backgroundColor: '#312E81',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+  },
+  badgeText: {
+    color: '#E0E7FF',
     fontSize: 12,
     fontWeight: '600',
   },
-  quantityContainer: {
-    marginTop: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  badgeTextOk: {
+    color: '#10B981',
   },
-  quantityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  badgeTextDanger: {
+    color: '#F87171',
   },
-  quantityText: {
-    marginLeft: 8,
-    color: '#374151',
-  },
-  priorityBadge: {
-    paddingHorizontal: 10,
+  criticalBadge: {
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
   },
-  priorityText: {
-    fontSize: 12,
+  criticalDanger: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  criticalOk: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  activeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+  },
+  activeOn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  activeOff: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  warehouseTitle: {
+    color: '#F3F4F6',
     fontWeight: '600',
   },
-  observationsContainer: {
-    marginTop: 12,
+  warehouseMeta: {
+    marginTop: 4,
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
-  observationsLabel: {
+  warehouseMetaText: {
+    color: '#CBD5F5',
     fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  observationsText: {
-    color: '#374151',
-  },
-  requestFooter: {
-    marginTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dateText: {
-    marginLeft: 8,
-    color: '#6B7280',
   },
 });

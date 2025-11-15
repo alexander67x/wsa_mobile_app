@@ -20,6 +20,10 @@ const priorities = [
 interface MaterialRequest {
   materialId: string;
   quantity: number;
+  code: string;
+  product: string;
+  brandModel: string;
+  description: string;
 }
 
 export default function RequestMaterialScreen() {
@@ -27,34 +31,53 @@ export default function RequestMaterialScreen() {
   const [materialRequests, setMaterialRequests] = useState<MaterialRequest[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [itemCode, setItemCode] = useState('');
+  const [itemProduct, setItemProduct] = useState('');
+  const [itemBrand, setItemBrand] = useState('');
+  const [itemDescription, setItemDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Load catalog when a project is selected
     if (selectedProject) {
-      listCatalog(selectedProject).then(items => { 
-        materialsStatic = items; 
-        setSelectedMaterial(items[0]?.id || ''); 
-      }).catch(() => {});
+      listCatalog(selectedProject)
+        .then(items => {
+          materialsStatic = items;
+          setSelectedMaterial(items[0]?.id || '');
+        })
+        .catch(() => {});
     }
   }, [selectedProject]);
 
   const addMaterialRequest = () => {
     if (!selectedMaterial || !quantity || isNaN(Number(quantity))) {
-      Alert.alert('Error', 'Por favor selecciona un material y cantidad válida');
+      Alert.alert('Error', 'Selecciona un material y una cantidad valida');
+      return;
+    }
+
+    if (!itemCode.trim() || !itemProduct.trim() || !itemBrand.trim() || !itemDescription.trim()) {
+      Alert.alert('Error', 'Codigo, producto, marca y descripcion son obligatorios');
       return;
     }
 
     const newRequest: MaterialRequest = {
       materialId: selectedMaterial,
       quantity: Number(quantity),
+      code: itemCode.trim(),
+      product: itemProduct.trim(),
+      brandModel: itemBrand.trim(),
+      description: itemDescription.trim(),
     };
 
     setMaterialRequests([...materialRequests, newRequest]);
-    setSelectedMaterial('');
+    setSelectedMaterial(materialsStatic[0]?.id || '');
     setQuantity('1');
+    setItemCode('');
+    setItemProduct('');
+    setItemBrand('');
+    setItemDescription('');
   };
 
   const removeMaterialRequest = (index: number) => {
@@ -64,7 +87,6 @@ export default function RequestMaterialScreen() {
 
   const updateQuantity = (index: number, newQuantity: number) => {
     if (newQuantity < 1) return;
-
     const updatedRequests = [...materialRequests];
     updatedRequests[index].quantity = newQuantity;
     setMaterialRequests(updatedRequests);
@@ -82,12 +104,17 @@ export default function RequestMaterialScreen() {
 
   const handleSubmit = async () => {
     if (!selectedProject) {
-      Alert.alert('Error', 'Por favor selecciona un proyecto');
+      Alert.alert('Error', 'Selecciona un proyecto');
+      return;
+    }
+
+    if (!deliveryDate.trim()) {
+      Alert.alert('Error', 'Ingresa la fecha de entrega');
       return;
     }
 
     if (materialRequests.length === 0) {
-      Alert.alert('Error', 'Por favor agrega al menos un equipo');
+      Alert.alert('Error', 'Agrega al menos un material');
       return;
     }
 
@@ -96,20 +123,25 @@ export default function RequestMaterialScreen() {
     setTimeout(() => {
       setIsSubmitting(false);
       Alert.alert(
-        'Solicitud Enviada',
-        'Tu solicitud de equipos de seguridad ha sido enviada exitosamente y está siendo revisada.',
+        'Solicitud enviada',
+        'Tu solicitud fue enviada y esta en revision.',
         [
           {
-            text: 'Ver Solicitudes',
-            onPress: () => router.push('/(tabs)/materials'),
+            text: 'Ver solicitudes',
+            onPress: () => router.push('/material-requests'),
           },
           {
-            text: 'Crear Nueva',
+            text: 'Crear nueva',
             onPress: () => {
               setSelectedProject('');
               setMaterialRequests([]);
               setPriority('medium');
               setObservations('');
+              setDeliveryDate('');
+              setItemCode('');
+              setItemProduct('');
+              setItemBrand('');
+              setItemDescription('');
             },
           },
         ]
@@ -122,10 +154,7 @@ export default function RequestMaterialScreen() {
       <StatusBar style="light" />
 
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Solicitar Equipos</Text>
@@ -134,25 +163,19 @@ export default function RequestMaterialScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Información Básica</Text>
+          <Text style={styles.sectionTitle}>Informacion Basica</Text>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Proyecto <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>Asignacion de proyecto <Text style={styles.required}>*</Text></Text>
             <View style={styles.pickerContainer}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {projects.map(project => (
                   <TouchableOpacity
                     key={project.id}
-                    style={[
-                      styles.pickerOption,
-                      selectedProject === project.id && styles.pickerOptionActive
-                    ]}
+                    style={[styles.pickerOption, selectedProject === project.id && styles.pickerOptionActive]}
                     onPress={() => setSelectedProject(project.id)}
                   >
-                    <Text style={[
-                      styles.pickerOptionText,
-                      selectedProject === project.id && styles.pickerOptionTextActive
-                    ]}>
+                    <Text style={[styles.pickerOptionText, selectedProject === project.id && styles.pickerOptionTextActive]}>
                       {project.name}
                     </Text>
                   </TouchableOpacity>
@@ -162,23 +185,27 @@ export default function RequestMaterialScreen() {
           </View>
 
           <View style={styles.formGroup}>
+            <Text style={styles.label}>Fecha de entrega <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="AAAA-MM-DD"
+              value={deliveryDate}
+              onChangeText={setDeliveryDate}
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          <View style={styles.formGroup}>
             <Text style={styles.label}>Prioridad <Text style={styles.required}>*</Text></Text>
             <View style={styles.typeContainer}>
               {priorities.map(prio => (
                 <TouchableOpacity
                   key={prio.key}
-                  style={[
-                    styles.typeOption,
-                    { borderColor: prio.color },
-                    priority === prio.key && { backgroundColor: prio.color + '20' }
-                  ]}
+                  style={[styles.typeOption, { borderColor: prio.color }, priority === prio.key && { backgroundColor: prio.color + '20' }]}
                   onPress={() => setPriority(prio.key)}
                 >
                   <View style={[styles.typeIndicator, { backgroundColor: prio.color }]} />
-                  <Text style={[
-                    styles.typeText,
-                    { color: priority === prio.key ? prio.color : '#6B7280' }
-                  ]}>
+                  <Text style={[styles.typeText, { color: priority === prio.key ? prio.color : '#6B7280' }]}>
                     {prio.label}
                   </Text>
                 </TouchableOpacity>
@@ -198,22 +225,62 @@ export default function RequestMaterialScreen() {
                   {materialsStatic.map(material => (
                     <TouchableOpacity
                       key={material.id}
-                      style={[
-                        styles.pickerOption,
-                        selectedMaterial === material.id && styles.pickerOptionActive
-                      ]}
+                      style={[styles.pickerOption, selectedMaterial === material.id && styles.pickerOptionActive]}
                       onPress={() => setSelectedMaterial(material.id)}
                     >
-                      <Text style={[
-                        styles.pickerOptionText,
-                        selectedMaterial === material.id && styles.pickerOptionTextActive
-                      ]}>
+                      <Text style={[styles.pickerOptionText, selectedMaterial === material.id && styles.pickerOptionTextActive]}>
                         {material.name}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Codigo del material <Text style={styles.required}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej. MAT-001"
+                value={itemCode}
+                onChangeText={setItemCode}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Tipo de material / producto <Text style={styles.required}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej. Camara IP, sensor, servicio"
+                value={itemProduct}
+                onChangeText={setItemProduct}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Marca / Modelo <Text style={styles.required}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej. Hikvision DS-2CD2347G1"
+                value={itemBrand}
+                onChangeText={setItemBrand}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Descripcion del producto o servicio <Text style={styles.required}>*</Text></Text>
+              <TextInput
+                style={[styles.textArea, styles.compactTextArea]}
+                placeholder="Detalla especificaciones, ubicacion o uso"
+                multiline
+                numberOfLines={3}
+                value={itemDescription}
+                onChangeText={setItemDescription}
+                placeholderTextColor="#9CA3AF"
+              />
             </View>
 
             <View style={styles.quantityRow}>
@@ -246,7 +313,13 @@ export default function RequestMaterialScreen() {
               <Text style={styles.summaryTitle}>Resumen</Text>
               {materialRequests.map((item, index) => (
                 <View key={index} style={styles.summaryRow}>
-                  <Text style={styles.summaryName}>{getMaterialName(item.materialId)}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.summaryName}>{getMaterialName(item.materialId)}</Text>
+                    <Text style={styles.summaryMeta}>Codigo: {item.code}</Text>
+                    <Text style={styles.summaryMeta}>Producto: {item.product}</Text>
+                    <Text style={styles.summaryMeta}>Marca/Modelo: {item.brandModel}</Text>
+                    <Text style={styles.summaryMeta}>Descripcion: {item.description}</Text>
+                  </View>
                   <View style={styles.summaryControls}>
                     <TouchableOpacity onPress={() => updateQuantity(index, item.quantity - 1)} style={styles.smallBtn}>
                       <Minus size={16} color="#1F2937" />
@@ -269,7 +342,7 @@ export default function RequestMaterialScreen() {
           <Text style={styles.sectionTitle}>Observaciones</Text>
           <TextInput
             style={styles.textArea}
-            placeholder="Detalles de la instalación, ubicación, referencias, etc."
+            placeholder="Detalles de la instalacion, ubicacion, referencias, etc."
             multiline
             numberOfLines={4}
             value={observations}
@@ -280,7 +353,11 @@ export default function RequestMaterialScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={isSubmitting}>
+        <TouchableOpacity
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
           <Save size={20} color="#FFFFFF" />
           <Text style={styles.submitButtonText}>{isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}</Text>
         </TouchableOpacity>
@@ -308,6 +385,14 @@ const styles = StyleSheet.create({
   formGroup: { marginBottom: 16 },
   label: { color: '#374151', marginBottom: 8, fontWeight: '600' },
   required: { color: '#EF4444' },
+  input: {
+    borderColor: '#D1D5DB',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#111827',
+  },
   pickerContainer: { flexDirection: 'row' },
   pickerOption: { paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, backgroundColor: '#F3F4F6', borderRadius: 16 },
   pickerOptionActive: { backgroundColor: '#2563EB' },
@@ -327,14 +412,16 @@ const styles = StyleSheet.create({
   addButtonText: { color: '#FFFFFF', fontWeight: '600', marginLeft: 8 },
   summaryCard: { marginTop: 12, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12 },
   summaryTitle: { fontWeight: '700', marginBottom: 8, color: '#111827' },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  summaryName: { color: '#111827', flex: 1 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  summaryName: { color: '#111827', fontWeight: '600' },
+  summaryMeta: { color: '#6B7280', fontSize: 12 },
   summaryControls: { flexDirection: 'row', alignItems: 'center' },
   smallBtn: { backgroundColor: '#E5E7EB', padding: 6, borderRadius: 8 },
   summaryQty: { width: 36, textAlign: 'center', color: '#111827' },
   removeBtn: { marginLeft: 8, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: '#FEE2E2' },
   removeText: { color: '#B91C1C', fontWeight: '600' },
   textArea: { borderColor: '#D1D5DB', borderWidth: 1, borderRadius: 12, padding: 12, minHeight: 96, textAlignVertical: 'top', color: '#111827' },
+  compactTextArea: { minHeight: 72 },
   footer: { padding: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E5E7EB' },
   submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563EB', padding: 14, borderRadius: 12 },
   submitButtonDisabled: { opacity: 0.6 },
