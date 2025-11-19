@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { MapPin, Calendar, ChartBar as BarChart3, Plus, Search } from 'lucide-react-native';
-import { listProjects } from '@/services/projects';
+import { getMyProjects } from '@/services/projects';
 import type { Project } from '@/types/domain';
 
 export default function WorkerHome() {
@@ -12,7 +12,7 @@ export default function WorkerHome() {
 
   useEffect(() => {
     setIsLoading(true);
-    listProjects()
+    getMyProjects()
       .then(setProjects)
       .catch((error) => {
         console.error('Error loading projects:', error);

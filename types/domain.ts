@@ -57,19 +57,81 @@ export interface ReportDetail {
   feedback?: string;
 }
 
-export interface MaterialRequest {
+export type MaterialPriority = 'low' | 'medium' | 'high';
+
+export type MaterialRequestStatus =
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'sent'
+  | 'delivered'
+  | 'rejected';
+
+export interface MaterialDelivery {
   id: Id;
-  projectName: string;
-  materialName: string;
+  requestItemId?: Id;
   quantity: number;
-  unit: string;
-  requestDate: string;
-  status: 'pending' | 'approved' | 'rejected' | 'delivered';
-  priority: 'low' | 'medium' | 'high';
+  lotId?: Id | null;
+  lotNumber?: string | null;
+  deliveredAt?: string;
+  deliveredBy?: string;
   observations?: string;
 }
 
-export interface CatalogItem { id: Id; name: string; unit: string }
+export interface MaterialRequestItem {
+  id: Id;
+  materialId?: Id;
+  materialName: string;
+  unit?: string;
+  requestedQty: number;
+  approvedQty: number;
+  deliveredQty: number;
+  observations?: string;
+  lotId?: Id | null;
+  lotNumber?: string | null;
+  deliveries?: MaterialDelivery[];
+}
+
+export interface MaterialRequest {
+  id: Id;
+  code?: string;
+  projectId?: Id;
+  projectName: string;
+  requesterName?: string;
+  requestDate: string;
+  status: MaterialRequestStatus;
+  statusLabel?: string;
+  priority: MaterialPriority;
+  observations?: string;
+  deliveryProgress?: number;
+  totalItems?: number;
+  totalApprovedQuantity?: number;
+  totalDeliveredQuantity?: number;
+  materialName?: string;
+  quantity?: number;
+  unit?: string;
+}
+
+export interface MaterialRequestDetail extends MaterialRequest {
+  items: MaterialRequestItem[];
+  deliveries?: MaterialDelivery[];
+  approvedAt?: string;
+  receivedAt?: string;
+  rejectedAt?: string;
+  updatedAt?: string;
+  warehouseName?: string;
+}
+
+export interface CatalogItem {
+  id: Id;
+  name: string;
+  unit: string;
+  sku?: string;
+  code?: string;
+  description?: string;
+  brand?: string;
+  model?: string;
+}
 
 export interface TeamMember {
   id: Id;

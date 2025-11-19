@@ -1,22 +1,77 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
-import { Plus, Package, Clock, CircleCheck as CheckCircle, Circle as XCircle, Calendar } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import {
+  Plus,
+  Package,
+  Clock,
+  CircleCheck as CheckCircle,
+  Circle as XCircle,
+  Calendar,
+  CircleDot,
+  Truck,
+} from 'lucide-react-native';
 import { listMaterialRequests } from '@/services/materials';
 import type { MaterialRequest } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
 
+type FilterKey = 'all' | MaterialRequest['status'];
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'Todos' },
+  { key: 'pending', label: 'Pendientes' },
+  { key: 'approved', label: 'Aprobados' },
+  { key: 'sent', label: 'Enviados' },
+  { key: 'delivered', label: 'Entregados' },
+  { key: 'rejected', label: 'Rechazados' },
+  { key: 'draft', label: 'Borradores' },
+];
+
 export default function MaterialsScreen() {
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadRequests = useCallback(async () => {
+    try {
+      if (!isRefreshing) setIsLoading(true);
+      const data = await listMaterialRequests();
+      setRequests(data);
+    } catch {
+      setRequests([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing]);
 
   useEffect(() => {
-    listMaterialRequests().then(setRequests).catch(() => setRequests([]));
-  }, []);
+    loadRequests();
+  }, [loadRequests]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadRequests();
+    }, [loadRequests])
+  );
+
+  const onRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    loadRequests();
+  }, [loadRequests]);
 
   const filteredRequests = requests.filter(request => {
     if (activeFilter === 'all') return true;
-    return request.status === (activeFilter as any);
+    return request.status === activeFilter;
   });
 
   const getStatusColor = (status: string) => {
@@ -25,6 +80,8 @@ export default function MaterialsScreen() {
       case 'approved': return '#3B82F6';
       case 'pending': return '#F59E0B';
       case 'rejected': return '#EF4444';
+      case 'sent': return '#2563EB';
+      case 'draft': return '#6B7280';
       default: return '#6B7280';
     }
   };
@@ -35,6 +92,8 @@ export default function MaterialsScreen() {
       case 'approved': return <Package size={16} color="#3B82F6" />;
       case 'pending': return <Clock size={16} color="#F59E0B" />;
       case 'rejected': return <XCircle size={16} color="#EF4444" />;
+      case 'sent': return <Truck size={16} color="#2563EB" />;
+      case 'draft': return <CircleDot size={16} color="#6B7280" />;
       default: return <Clock size={16} color="#6B7280" />;
     }
   };
@@ -45,6 +104,8 @@ export default function MaterialsScreen() {
       case 'approved': return 'Aprobado';
       case 'pending': return 'Pendiente';
       case 'rejected': return 'Rechazado';
+      case 'sent': return 'Enviado';
+      case 'draft': return 'Borrador';
       default: return 'Desconocido';
     }
   };
@@ -65,6 +126,27 @@ export default function MaterialsScreen() {
       case 'low': return 'Baja';
       default: return 'Normal';
     }
+  };
+
+  const renderProgress = (progress?: number | null, approved?: number, delivered?: number) => {
+    if (progress === null || progress === undefined) {
+      if (!approved || approved <= 0) return null;
+      progress = Math.min(100, Math.round(((delivered ?? 0) / approved) * 100));
+    }
+
+    const safeProgress = Math.min(100, Math.max(0, progress));
+
+    return (
+      <View style={styles.progressContainer}>
+        <View style={styles.progressHeader}>
+          <Text style={styles.progressLabel}>Avance de entrega</Text>
+          <Text style={styles.progressValue}>{safeProgress}%</Text>
+        </View>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${safeProgress}%` }]} />
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -88,79 +170,114 @@ export default function MaterialsScreen() {
 
         <View style={styles.filterContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {[
-              { key: 'all', label: 'Todos', count: requests.length },
-              { key: 'pending', label: 'Pendientes', count: requests.filter(r => r.status === 'pending').length },
-              { key: 'approved', label: 'Aprobados', count: requests.filter(r => r.status === 'approved').length },
-              { key: 'delivered', label: 'Entregados', count: requests.filter(r => r.status === 'delivered').length },
-              { key: 'rejected', label: 'Rechazados', count: requests.filter(r => r.status === 'rejected').length },
-            ].map(filter => (
-              <TouchableOpacity
-                key={filter.key}
-                style={[
-                  styles.filterButton,
-                  activeFilter === filter.key && styles.filterButtonActive
-                ]}
-                onPress={() => setActiveFilter(filter.key)}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  activeFilter === filter.key && styles.filterButtonTextActive,
-                ]}>
-                  {filter.label} ({filter.count})
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {FILTERS.map(filter => {
+              const count =
+                filter.key === 'all'
+                  ? requests.length
+                  : requests.filter(r => r.status === filter.key).length;
+              return (
+                <TouchableOpacity
+                  key={filter.key}
+                  style={[
+                    styles.filterButton,
+                    activeFilter === filter.key && styles.filterButtonActive
+                  ]}
+                  onPress={() => setActiveFilter(filter.key)}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    activeFilter === filter.key && styles.filterButtonTextActive,
+                  ]}>
+                    {filter.label} ({count})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       </View>
 
-      <ScrollView style={styles.requestsList} showsVerticalScrollIndicator={false}>
-        {filteredRequests.map(request => (
-          <View key={request.id} style={styles.requestCard}>
-            <View style={styles.requestHeader}>
-              <View style={styles.materialInfo}>
-                <Text style={styles.materialName}>{request.materialName}</Text>
-                <Text style={styles.projectName}>{request.projectName}</Text>
+      {isLoading && !isRefreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text style={styles.loadingText}>Cargando solicitudes...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.requestsList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+          }
+        >
+          {filteredRequests.map(request => (
+            <TouchableOpacity
+              key={request.id}
+              style={styles.requestCard}
+              activeOpacity={0.9}
+              onPress={() => {
+                if (!request.id) return;
+                router.push({
+                  pathname: '/material-request-detail',
+                  params: { id: String(request.id) },
+                } as any);
+              }}
+            >
+              <View style={styles.requestHeader}>
+                <View style={styles.materialInfo}>
+                  <Text style={styles.materialName}>{request.materialName || 'Solicitud de materiales'}</Text>
+                  <Text style={styles.projectName}>{request.projectName}</Text>
+                </View>
+                <View style={styles.statusBadge}>
+                  {getStatusIcon(request.status)}
+                  <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
+                    {request.statusLabel || getStatusText(request.status)}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.statusBadge}>
-                {getStatusIcon(request.status)}
-                <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
-                  {getStatusText(request.status)}
-                </Text>
-              </View>
-            </View>
 
-            <View style={styles.quantityContainer}>
-              <View style={styles.quantityInfo}>
-                <Package size={16} color="#6B7280" />
-                <Text style={styles.quantityText}>
-                  {request.quantity} {request.unit}
-                </Text>
+              <View style={styles.quantityContainer}>
+                <View style={styles.quantityInfo}>
+                  <Package size={16} color="#6B7280" />
+                  <Text style={styles.quantityText}>
+                    {(request.quantity ?? request.totalApprovedQuantity ?? 0)} {request.unit || 'unidades'}
+                  </Text>
+                </View>
+                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(request.priority) + '20' }]}>
+                  <Text style={[styles.priorityText, { color: getPriorityColor(request.priority) }]}>
+                    {getPriorityText(request.priority)}
+                  </Text>
+                </View>
               </View>
-              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(request.priority) + '20' }]}>
-                <Text style={[styles.priorityText, { color: getPriorityColor(request.priority) }]}>
-                  {getPriorityText(request.priority)}
-                </Text>
-              </View>
-            </View>
 
-            {request.observations && (
-              <View style={styles.observationsContainer}>
-                <Text style={styles.observationsLabel}>Observaciones:</Text>
-                <Text style={styles.observationsText}>{request.observations}</Text>
-              </View>
-            )}
+              {renderProgress(request.deliveryProgress, request.totalApprovedQuantity ?? request.quantity, request.totalDeliveredQuantity)}
 
-            <View style={styles.requestFooter}>
-              <View style={styles.dateContainer}>
-                <Calendar size={16} color="#6B7280" />
-                <Text style={styles.dateText}>Solicitado: {request.requestDate}</Text>
+              {request.observations && (
+                <View style={styles.observationsContainer}>
+                  <Text style={styles.observationsLabel}>Observaciones:</Text>
+                  <Text style={styles.observationsText}>{request.observations}</Text>
+                </View>
+              )}
+
+              <View style={styles.requestFooter}>
+                <View style={styles.dateContainer}>
+                  <Calendar size={16} color="#6B7280" />
+                  <Text style={styles.dateText}>Solicitado: {request.requestDate}</Text>
+                </View>
               </View>
+            </TouchableOpacity>
+          ))}
+
+          {!filteredRequests.length && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No hay solicitudes</Text>
+              <Text style={styles.emptySubtitle}>
+                Crea una nueva solicitud o ajusta los filtros para ver resultados.
+              </Text>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -235,33 +352,33 @@ const styles = StyleSheet.create({
   },
   requestsList: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
   },
   requestCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#111827',
+    shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
   requestHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: 12,
   },
   materialInfo: {
     flex: 1,
+    paddingRight: 12,
   },
   materialName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
   },
   projectName: {
     fontSize: 14,
@@ -309,14 +426,20 @@ const styles = StyleSheet.create({
   },
   observationsLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    fontWeight: '600',
+    color: '#4B5563',
     marginBottom: 4,
   },
   observationsText: {
-    color: '#374151',
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
   },
   requestFooter: {
-    marginTop: 12,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -328,5 +451,59 @@ const styles = StyleSheet.create({
   dateText: {
     marginLeft: 8,
     color: '#6B7280',
+    fontSize: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#6B7280',
+  },
+  progressContainer: {
+    marginTop: 12,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  progressValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 999,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2563EB',
+    borderRadius: 999,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  emptySubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

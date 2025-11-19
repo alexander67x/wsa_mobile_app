@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Pressable, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Package, Plus, Minus, Save } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { listCatalog } from '@/services/materials';
-import { mockProjects } from '@/mocks/projects';
+import { getMyProjects } from '@/services/projects';
 import type { CatalogItem } from '@/types/domain';
 
-const projects = mockProjects.map(p => ({ id: p.id, name: p.name }));
 let materialsStatic: CatalogItem[] = [];
 
 const priorities = [
@@ -20,36 +20,85 @@ const priorities = [
 interface MaterialRequest {
   materialId: string;
   quantity: number;
-  code: string;
-  product: string;
-  brandModel: string;
-  description: string;
+  name: string;
+  unit?: string;
+  sku?: string;
 }
 
 export default function RequestMaterialScreen() {
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedProject, setSelectedProject] = useState('');
   const [materialRequests, setMaterialRequests] = useState<MaterialRequest[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [deliveryDate, setDeliveryDate] = useState('');
-  const [itemCode, setItemCode] = useState('');
-  const [itemProduct, setItemProduct] = useState('');
-  const [itemBrand, setItemBrand] = useState('');
-  const [itemDescription, setItemDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showIosDatePicker, setShowIosDatePicker] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const apiProjects = await getMyProjects();
+        const mapped = apiProjects.map(p => ({ id: p.id, name: p.name }));
+        if (!mounted) return;
+        setProjects(mapped);
+        if (!selectedProject && mapped[0]?.id) {
+          setSelectedProject(mapped[0].id);
+        }
+      } catch (error) {
+        console.error('Error loading projects', error);
+        if (mounted) {
+          Alert.alert('Error', 'No se pudieron cargar tus proyectos asignados');
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (selectedProject) {
+      materialsStatic = [];
+      setSelectedMaterial('');
       listCatalog(selectedProject)
         .then(items => {
           materialsStatic = items;
           setSelectedMaterial(items[0]?.id || '');
         })
         .catch(() => {});
+    } else {
+      materialsStatic = [];
+      setSelectedMaterial('');
     }
   }, [selectedProject]);
+
+  const formatDate = (date: Date) => date.toISOString().slice(0, 10);
+
+  const onDatePickerChange = (_event: DateTimePickerEvent, date?: Date) => {
+    if (date) {
+      setDeliveryDate(formatDate(date));
+    }
+    if (Platform.OS === 'ios') {
+      setShowIosDatePicker(false);
+    }
+  };
+
+  const openDatePicker = () => {
+    const currentDate = deliveryDate ? new Date(deliveryDate) : new Date();
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: currentDate,
+        mode: 'date',
+        onChange: onDatePickerChange,
+      });
+    } else {
+      setShowIosDatePicker(true);
+    }
+  };
 
   const addMaterialRequest = () => {
     if (!selectedMaterial || !quantity || isNaN(Number(quantity))) {
@@ -57,27 +106,23 @@ export default function RequestMaterialScreen() {
       return;
     }
 
-    if (!itemCode.trim() || !itemProduct.trim() || !itemBrand.trim() || !itemDescription.trim()) {
-      Alert.alert('Error', 'Codigo, producto, marca y descripcion son obligatorios');
+    const material = materialsStatic.find(m => m.id === selectedMaterial);
+    if (!material) {
+      Alert.alert('Error', 'No se pudo obtener la información del material seleccionado');
       return;
     }
 
     const newRequest: MaterialRequest = {
       materialId: selectedMaterial,
       quantity: Number(quantity),
-      code: itemCode.trim(),
-      product: itemProduct.trim(),
-      brandModel: itemBrand.trim(),
-      description: itemDescription.trim(),
+      name: material.name,
+      unit: material.unit,
+      sku: material.sku,
     };
 
     setMaterialRequests([...materialRequests, newRequest]);
     setSelectedMaterial(materialsStatic[0]?.id || '');
     setQuantity('1');
-    setItemCode('');
-    setItemProduct('');
-    setItemBrand('');
-    setItemDescription('');
   };
 
   const removeMaterialRequest = (index: number) => {
@@ -102,6 +147,11 @@ export default function RequestMaterialScreen() {
     return material ? material.unit : '';
   };
 
+  const getMaterialSku = (materialId: string) => {
+    const material = materialsStatic.find(m => m.id === materialId);
+    return material?.sku;
+  };
+
   const handleSubmit = async () => {
     if (!selectedProject) {
       Alert.alert('Error', 'Selecciona un proyecto');
@@ -109,7 +159,7 @@ export default function RequestMaterialScreen() {
     }
 
     if (!deliveryDate.trim()) {
-      Alert.alert('Error', 'Ingresa la fecha de entrega');
+      Alert.alert('Error', 'Selecciona la fecha de entrega');
       return;
     }
 
@@ -138,10 +188,6 @@ export default function RequestMaterialScreen() {
               setPriority('medium');
               setObservations('');
               setDeliveryDate('');
-              setItemCode('');
-              setItemProduct('');
-              setItemBrand('');
-              setItemDescription('');
             },
           },
         ]
@@ -168,31 +214,41 @@ export default function RequestMaterialScreen() {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Asignacion de proyecto <Text style={styles.required}>*</Text></Text>
             <View style={styles.pickerContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {projects.map(project => (
-                  <TouchableOpacity
-                    key={project.id}
-                    style={[styles.pickerOption, selectedProject === project.id && styles.pickerOptionActive]}
-                    onPress={() => setSelectedProject(project.id)}
-                  >
-                    <Text style={[styles.pickerOptionText, selectedProject === project.id && styles.pickerOptionTextActive]}>
-                      {project.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {projects.length === 0 ? (
+                <Text style={{ color: '#9CA3AF' }}>No tienes proyectos asignados</Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {projects.map(project => (
+                    <TouchableOpacity
+                      key={project.id}
+                      style={[styles.pickerOption, selectedProject === project.id && styles.pickerOptionActive]}
+                      onPress={() => setSelectedProject(project.id)}
+                    >
+                      <Text style={[styles.pickerOptionText, selectedProject === project.id && styles.pickerOptionTextActive]}>
+                        {project.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
             </View>
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Fecha de entrega <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="AAAA-MM-DD"
-              value={deliveryDate}
-              onChangeText={setDeliveryDate}
-              placeholderTextColor="#9CA3AF"
-            />
+            <Pressable style={styles.input} onPress={openDatePicker}>
+              <Text style={{ color: deliveryDate ? '#111827' : '#9CA3AF' }}>
+                {deliveryDate || 'Selecciona una fecha'}
+              </Text>
+            </Pressable>
+            {Platform.OS === 'ios' && showIosDatePicker && (
+              <DateTimePicker
+                value={deliveryDate ? new Date(deliveryDate) : new Date()}
+                mode="date"
+                display="spinner"
+                onChange={onDatePickerChange}
+              />
+            )}
           </View>
 
           <View style={styles.formGroup}>
@@ -219,7 +275,7 @@ export default function RequestMaterialScreen() {
 
           <View style={styles.addMaterialContainer}>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Equipo</Text>
+              <Text style={styles.label}>Equipo <Text style={styles.required}>*</Text></Text>
               <View style={styles.pickerContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {materialsStatic.map(material => (
@@ -231,56 +287,32 @@ export default function RequestMaterialScreen() {
                       <Text style={[styles.pickerOptionText, selectedMaterial === material.id && styles.pickerOptionTextActive]}>
                         {material.name}
                       </Text>
+                      {material.sku ? (
+                        <Text style={[styles.pickerSku, selectedMaterial === material.id && styles.pickerOptionTextActive]}>
+                          {material.sku}
+                        </Text>
+                      ) : null}
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
+              {selectedMaterial ? (
+                <View style={styles.materialMeta}>
+                  <Text style={styles.materialMetaText}>
+                    Codigo / SKU: {getMaterialSku(selectedMaterial) || selectedMaterial}
+                  </Text>
+                  <Text style={styles.materialMetaText}>
+                    Unidad: {getMaterialUnit(selectedMaterial) || 'N/D'}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Codigo del material <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej. MAT-001"
-                value={itemCode}
-                onChangeText={setItemCode}
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Tipo de material / producto <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej. Camara IP, sensor, servicio"
-                value={itemProduct}
-                onChangeText={setItemProduct}
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Marca / Modelo <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej. Hikvision DS-2CD2347G1"
-                value={itemBrand}
-                onChangeText={setItemBrand}
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Descripcion del producto o servicio <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={[styles.textArea, styles.compactTextArea]}
-                placeholder="Detalla especificaciones, ubicacion o uso"
-                multiline
-                numberOfLines={3}
-                value={itemDescription}
-                onChangeText={setItemDescription}
-                placeholderTextColor="#9CA3AF"
-              />
+              <Text style={styles.label}>Producto</Text>
+              <Text style={styles.readonlyValue}>
+                {selectedMaterial ? getMaterialName(selectedMaterial) : 'Selecciona un material'}
+              </Text>
             </View>
 
             <View style={styles.quantityRow}>
@@ -314,11 +346,10 @@ export default function RequestMaterialScreen() {
               {materialRequests.map((item, index) => (
                 <View key={index} style={styles.summaryRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.summaryName}>{getMaterialName(item.materialId)}</Text>
-                    <Text style={styles.summaryMeta}>Codigo: {item.code}</Text>
-                    <Text style={styles.summaryMeta}>Producto: {item.product}</Text>
-                    <Text style={styles.summaryMeta}>Marca/Modelo: {item.brandModel}</Text>
-                    <Text style={styles.summaryMeta}>Descripcion: {item.description}</Text>
+                    <Text style={styles.summaryName}>{item.name}</Text>
+                    <Text style={styles.summaryMeta}>
+                      {item.sku || item.materialId} • {item.unit || 'unidad'}
+                    </Text>
                   </View>
                   <View style={styles.summaryControls}>
                     <TouchableOpacity onPress={() => updateQuantity(index, item.quantity - 1)} style={styles.smallBtn}>
@@ -398,6 +429,10 @@ const styles = StyleSheet.create({
   pickerOptionActive: { backgroundColor: '#2563EB' },
   pickerOptionText: { color: '#6B7280' },
   pickerOptionTextActive: { color: '#FFFFFF', fontWeight: '600' },
+  pickerSku: { color: '#9CA3AF', fontSize: 12 },
+  materialMeta: { marginTop: 8 },
+  materialMetaText: { color: '#6B7280', fontSize: 12 },
+  readonlyValue: { paddingVertical: 10, color: '#111827' },
   typeContainer: { flexDirection: 'row' },
   typeOption: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, borderWidth: 1, marginRight: 8 },
   typeIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },

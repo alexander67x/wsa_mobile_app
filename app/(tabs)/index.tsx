@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Search, MapPin, Calendar, ChartBar as BarChart3, Plus } from 'lucide-react-native';
-import { listProjects } from '@/services/projects';
+import { getMyProjects } from '@/services/projects';
 import type { Project } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
 
@@ -25,7 +25,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setIsLoading(true);
-    listProjects()
+    getMyProjects()
       .then(setProjects)
       .catch((error) => {
         console.error('Error loading projects:', error);

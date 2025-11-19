@@ -24,10 +24,11 @@ export default function WorkerCreateReport() {
     setTimeout(async () => {
       setIsSubmitting(false);
       const me = getUser();
+      const authorId = me?.employeeId || me?.id;
       await addCard('En revisión', {
         id: String(Date.now()),
         title: description.trim().slice(0, 60) || 'Reporte',
-        authorId: me?.id,
+        authorId,
         authorName: me?.name,
         description,
         photos: photosCount > 0 ? ['https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?auto=compress&cs=tinysrgb&w=400'] : [],

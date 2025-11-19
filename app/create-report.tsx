@@ -7,11 +7,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { getProject } from '@/services/projects';
 import { createReport, type ReportImage, type ReportMaterial } from '@/services/reports';
+import { createIncident, type IncidentImage } from '@/services/incidencias';
 import { getUser } from '@/services/auth';
 import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { listCatalog } from '@/services/materials';
 import type { ProjectDetail } from '@/types/domain';
 import type { CatalogItem } from '@/types/domain';
+import { Switch } from 'react-native';
 
 interface ImageWithTimestamp {
   uri: string;
@@ -33,7 +35,7 @@ const reportTypes = [
 ];
 
 export default function CreateReportScreen() {
-  const { projectId, taskId } = useLocalSearchParams();
+  const { projectId, taskId, sendAsIncident: sendAsIncidentParam } = useLocalSearchParams();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
   const [reportType, setReportType] = useState('progress');
@@ -52,6 +54,24 @@ export default function CreateReportScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [sendAsIncident, setSendAsIncident] = useState(sendAsIncidentParam === 'true');
+  const [incidentType, setIncidentType] = useState<'falla_equipos' | 'accidente' | 'retraso_material' | 'problema_calidad' | 'otro'>('otro');
+  const [incidentSeverity, setIncidentSeverity] = useState<'critica' | 'alta' | 'media' | 'baja'>('media');
+
+  const handleToggleChange = (value: boolean) => {
+    setSendAsIncident(value);
+    // Limpiar campos específicos cuando se cambia el modo
+    if (value) {
+      // Cambiando a incidencia: limpiar campos de reporte
+      setDifficulties('');
+      setObservations('');
+      setSelectedMaterials([]);
+    } else {
+      // Cambiando a reporte: limpiar campos de incidencia
+      setIncidentType('otro');
+      setIncidentSeverity('media');
+    }
+  };
 
   useEffect(() => {
     // Request camera, media library and location permissions
@@ -84,7 +104,9 @@ export default function CreateReportScreen() {
             if (foundTask) {
               setTask(foundTask);
               // Pre-llenar el título con el nombre de la tarea
-              setTitle(`Reporte de avance: ${foundTask.title}`);
+              if (!sendAsIncident && !sendAsIncidentParam) {
+                setTitle(`Reporte de avance: ${foundTask.title}`);
+              }
             }
           }
         })
@@ -290,8 +312,8 @@ export default function CreateReportScreen() {
   };
 
   const handleSave = async () => {
-    if (!projectId || !taskId) {
-      Alert.alert('Error', 'Faltan parámetros necesarios (proyecto o tarea)');
+    if (!projectId) {
+      Alert.alert('Error', 'Faltan parámetros necesarios (proyecto)');
       return;
     }
 
@@ -300,9 +322,20 @@ export default function CreateReportScreen() {
       return;
     }
 
+    if (sendAsIncident && !incidentType) {
+      Alert.alert('Error', 'Por favor selecciona el tipo de incidencia');
+      return;
+    }
+
     const user = getUser();
     if (!user || !user.id) {
       Alert.alert('Error', 'No se pudo obtener la información del usuario');
+      return;
+    }
+    const ensuredEmployeeId = await (await import('@/services/auth')).ensureEmployeeId();
+    const authorId = ensuredEmployeeId || user.employeeId || user.id;
+    if (!authorId) {
+      Alert.alert('Error', 'No se pudo obtener el código de empleado para el reporte');
       return;
     }
 
@@ -372,44 +405,87 @@ export default function CreateReportScreen() {
         }
       }
 
-      // Format materials for API
-      const reportMaterials: ReportMaterial[] = selectedMaterials.map(m => ({
-        materialId: Number(m.materialId) || m.materialId,
-        quantity: parseFloat(m.quantity),
-        unit: m.unit,
-        observations: m.observations || undefined,
-      }));
+      if (sendAsIncident) {
+        // Create incident instead of report
+        const incidentImages: IncidentImage[] = reportImages.map((img) => ({
+          url: img.url,
+          latitude: img.latitude,
+          longitude: img.longitude,
+          takenAt: img.takenAt,
+          // description can be added later if needed
+        }));
 
-      await createReport({
-        projectId: String(projectId),
-        taskId: Number(taskId) || String(taskId),
-        authorId: Number(user.id) || user.id,
-        title,
-        description,
-        difficulties: difficulties || undefined,
-        observations: observations || undefined,
-        images: reportImages.length > 0 ? reportImages : undefined,
-        materials: reportMaterials.length > 0 ? reportMaterials : undefined,
-      });
+        await createIncident({
+          projectId: String(projectId),
+          taskId: taskId ? (Number(taskId) || String(taskId)) : undefined,
+          authorId: Number(authorId) || String(authorId),
+          title,
+          description,
+          tipo: incidentType,
+          severidad: incidentSeverity,
+          latitude: deviceLocation?.latitude,
+          longitude: deviceLocation?.longitude,
+          images: incidentImages.length > 0 ? incidentImages : undefined,
+        });
 
-      Alert.alert(
-        'Éxito',
-        'Reporte guardado correctamente',
-        [
-          {
-            text: 'Ver Tarea',
-            onPress: () => router.push({
-              pathname: '/task-detail',
-              params: { projectId: String(projectId), taskId: String(taskId) }
-            }),
-          },
-          {
-            text: 'Continuar',
-            onPress: () => router.back(),
-            style: 'default',
-          },
-        ]
-      );
+        Alert.alert(
+          'Éxito',
+          'Incidencia creada correctamente',
+          [
+            ...(taskId ? [{
+              text: 'Ver Tarea',
+              onPress: () => router.push({
+                pathname: '/task-detail',
+                params: { projectId: String(projectId), taskId: String(taskId) }
+              }),
+            }] : []),
+            {
+              text: 'Continuar',
+              onPress: () => router.back(),
+              style: 'default',
+            },
+          ]
+        );
+      } else {
+        // Create normal report
+        const reportMaterials: ReportMaterial[] = selectedMaterials.map(m => ({
+          materialId: Number(m.materialId) || m.materialId,
+          quantity: parseFloat(m.quantity),
+          unit: m.unit,
+          observations: m.observations || undefined,
+        }));
+
+        await createReport({
+          projectId: String(projectId),
+          taskId: taskId ? (Number(taskId) || String(taskId)) : undefined,
+          authorId: Number(authorId) || String(authorId),
+          title,
+          description,
+          difficulties: difficulties || undefined,
+          observations: observations || undefined,
+          images: reportImages.length > 0 ? reportImages : undefined,
+          materials: reportMaterials.length > 0 ? reportMaterials : undefined,
+        });
+
+        Alert.alert(
+          'Éxito',
+          'Reporte guardado correctamente',
+          [
+            ...(taskId ? [{
+              text: 'Ver Tarea',
+              onPress: () => router.push({
+                pathname: '/task-detail',
+                params: { projectId: String(projectId), taskId: String(taskId) }
+              }),
+            }] : []),
+            {
+              text: 'Continuar',
+              onPress: () => router.back(),
+              style: 'default',
+            },
+          ]
+        );
+      }
     } catch (error: any) {
       console.error('Error creating report:', error);
       Alert.alert('Error', error?.message || 'No se pudo crear el reporte');
@@ -429,7 +505,9 @@ export default function CreateReportScreen() {
         >
           <ArrowLeft size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Crear Reporte</Text>
+        <Text style={styles.headerTitle}>
+          {sendAsIncident ? 'Crear Incidencia' : 'Crear Reporte'}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -461,106 +539,222 @@ export default function CreateReportScreen() {
                 </View>
               )}
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Título del Reporte <Text style={styles.required}>*</Text></Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ingresa el título del reporte"
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-            </View>
-
-            <View style={styles.formSection}>
-              <Text style={styles.sectionTitle}>Detalles del Reporte</Text>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Describe el avance, incidencias o detalles del trabajo realizado..."
-                  value={description}
-                  onChangeText={setDescription}
-                  multiline
-                  numberOfLines={6}
-                  textAlignVertical="top"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Dificultades Encontradas</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Describe cualquier dificultad o problema encontrado durante el trabajo..."
-                  value={difficulties}
-                  onChangeText={setDifficulties}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Materiales Utilizados</Text>
-                
-                <TouchableOpacity
-                  style={styles.addMaterialButton}
-                  onPress={openMaterialModal}
-                  disabled={isLoadingCatalog || catalogMaterials.length === 0}
-                >
-                  <Plus size={20} color="#2563EB" />
-                  <Text style={styles.addMaterialButtonText}>
-                    {isLoadingCatalog ? 'Cargando catálogo...' : 'Agregar Material'}
-                  </Text>
-                </TouchableOpacity>
-
-                {selectedMaterials.length > 0 && (
-                  <View style={styles.materialsList}>
-                    {selectedMaterials.map((material, index) => (
-                      <View key={index} style={styles.materialItem}>
-                        <View style={styles.materialInfo}>
-                          <Text style={styles.materialName}>{material.materialName}</Text>
-                          <Text style={styles.materialDetails}>
-                            {material.quantity} {material.unit}
-                            {material.observations && ` • ${material.observations}`}
-                          </Text>
-                        </View>
-                        <TouchableOpacity
-                          style={styles.removeMaterialButton}
-                          onPress={() => removeMaterial(index)}
-                        >
-                          <X size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+              {/* Solo mostrar toggle si no viene desde select-project-type */}
+              {!sendAsIncidentParam && (
+                <View style={styles.formGroup}>
+                  <View style={styles.switchContainer}>
+                    <View style={styles.switchLabelContainer}>
+                      <Text style={styles.label}>Enviar como Incidencia</Text>
+                      <Text style={styles.switchHint}>
+                        {sendAsIncident 
+                          ? 'Se creará una incidencia con campos específicos' 
+                          : 'Se creará un reporte normal con campos de avance'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={sendAsIncident}
+                      onValueChange={handleToggleChange}
+                      trackColor={{ false: '#E5E7EB', true: '#2563EB' }}
+                      thumbColor={sendAsIncident ? '#FFFFFF' : '#F3F4F6'}
+                    />
                   </View>
-                )}
-
-                {catalogMaterials.length > 0 && (
-                  <Text style={styles.materialHint}>
-                    {catalogMaterials.length} material{catalogMaterials.length !== 1 ? 'es' : ''} disponible{catalogMaterials.length !== 1 ? 's' : ''} en el catálogo
-                  </Text>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Observaciones Adicionales</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Observaciones, recomendaciones o comentarios adicionales..."
-                  value={observations}
-                  onChangeText={setObservations}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
+                </View>
+              )}
             </View>
+
+            {sendAsIncident ? (
+              // Formulario de Incidencia
+              <>
+                <View style={styles.formSection}>
+                  <Text style={styles.sectionTitle}>Detalles de la Incidencia</Text>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Título de la Incidencia <Text style={styles.required}>*</Text></Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ingresa el título de la incidencia"
+                      value={title}
+                      onChangeText={setTitle}
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder="Describe la incidencia en detalle..."
+                      value={description}
+                      onChangeText={setDescription}
+                      multiline
+                      numberOfLines={6}
+                      textAlignVertical="top"
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Tipo de Incidencia <Text style={styles.required}>*</Text></Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerContainer}>
+                      {[
+                        { key: 'falla_equipos', label: 'Falla de Equipos' },
+                        { key: 'accidente', label: 'Accidente' },
+                        { key: 'retraso_material', label: 'Retraso de Material' },
+                        { key: 'problema_calidad', label: 'Problema de Calidad' },
+                        { key: 'otro', label: 'Otro' },
+                      ].map((type) => (
+                        <TouchableOpacity
+                          key={type.key}
+                          style={[
+                            styles.pickerOption,
+                            incidentType === type.key && styles.pickerOptionActive
+                          ]}
+                          onPress={() => setIncidentType(type.key as any)}
+                        >
+                          <Text style={[
+                            styles.pickerOptionText,
+                            incidentType === type.key && styles.pickerOptionTextActive
+                          ]}>
+                            {type.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Severidad</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerContainer}>
+                      {[
+                        { key: 'critica', label: 'Crítica', color: '#DC2626' },
+                        { key: 'alta', label: 'Alta', color: '#F59E0B' },
+                        { key: 'media', label: 'Media', color: '#3B82F6' },
+                        { key: 'baja', label: 'Baja', color: '#10B981' },
+                      ].map((severity) => (
+                        <TouchableOpacity
+                          key={severity.key}
+                          style={[
+                            styles.pickerOption,
+                            incidentSeverity === severity.key && styles.pickerOptionActive
+                          ]}
+                          onPress={() => setIncidentSeverity(severity.key as any)}
+                        >
+                          <Text style={[
+                            styles.pickerOptionText,
+                            incidentSeverity === severity.key && styles.pickerOptionTextActive
+                          ]}>
+                            {severity.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </>
+            ) : (
+              // Formulario de Reporte Normal
+              <>
+                <View style={styles.formSection}>
+                  <Text style={styles.sectionTitle}>Detalles del Reporte</Text>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Título del Reporte <Text style={styles.required}>*</Text></Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ingresa el título del reporte"
+                      value={title}
+                      onChangeText={setTitle}
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text></Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder="Describe el avance, incidencias o detalles del trabajo realizado..."
+                      value={description}
+                      onChangeText={setDescription}
+                      multiline
+                      numberOfLines={6}
+                      textAlignVertical="top"
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Dificultades Encontradas</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder="Describe cualquier dificultad o problema encontrado durante el trabajo..."
+                      value={difficulties}
+                      onChangeText={setDifficulties}
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Materiales Utilizados</Text>
+                
+                    <TouchableOpacity
+                      style={styles.addMaterialButton}
+                      onPress={openMaterialModal}
+                      disabled={isLoadingCatalog || catalogMaterials.length === 0}
+                    >
+                      <Plus size={20} color="#2563EB" />
+                      <Text style={styles.addMaterialButtonText}>
+                        {isLoadingCatalog ? 'Cargando catálogo...' : 'Agregar Material'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {selectedMaterials.length > 0 && (
+                      <View style={styles.materialsList}>
+                        {selectedMaterials.map((material, index) => (
+                          <View key={index} style={styles.materialItem}>
+                            <View style={styles.materialInfo}>
+                              <Text style={styles.materialName}>{material.materialName}</Text>
+                              <Text style={styles.materialDetails}>
+                                {material.quantity} {material.unit}
+                                {material.observations && ` • ${material.observations}`}
+                              </Text>
+                            </View>
+                            <TouchableOpacity
+                              style={styles.removeMaterialButton}
+                              onPress={() => removeMaterial(index)}
+                            >
+                              <X size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {catalogMaterials.length > 0 && (
+                      <Text style={styles.materialHint}>
+                        {catalogMaterials.length} material{catalogMaterials.length !== 1 ? 'es' : ''} disponible{catalogMaterials.length !== 1 ? 's' : ''} en el catálogo
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Observaciones Adicionales</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder="Observaciones, recomendaciones o comentarios adicionales..."
+                      value={observations}
+                      onChangeText={setObservations}
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+                </View>
+              </>
+            )}
 
             <View style={styles.formSection}>
               <Text style={styles.sectionTitle}>Evidencias Fotográficas</Text>
@@ -615,6 +809,8 @@ export default function CreateReportScreen() {
                 ? 'Subiendo imágenes...' 
                 : isSubmitting 
                 ? 'Guardando...' 
+                : sendAsIncident 
+                ? 'Guardar Incidencia' 
                 : 'Guardar Reporte'}
             </Text>
           </TouchableOpacity>
@@ -1058,6 +1254,21 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
+  switchHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
   },
   // Modal styles
   modalOverlay: {

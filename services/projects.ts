@@ -113,3 +113,22 @@ export async function getProjectStock(projectId: string): Promise<ProjectStock> 
   return apiStock;
 }
 
+export async function getMyProjects(): Promise<Project[]> {
+  if (USE_MOCKS) return Promise.resolve(mockProjects);
+  
+  const apiProjects = await fetchJson<ApiProject[]>('/projects/my-projects');
+  
+  // Transform API data to app format
+  return apiProjects.map((p): Project => ({
+    id: p.id,
+    name: p.name,
+    location: p.client || 'Sin ubicación',
+    progress: 0, // API doesn't provide progress, default to 0
+    status: p.endDate && new Date(p.endDate) < new Date() ? 'completed' : 
+           p.startDate && new Date(p.startDate) > new Date() ? 'pending' : 'active',
+    dueDate: p.endDate || '',
+    tasksCount: 0,
+    reportsCount: 0,
+  }));
+}
+

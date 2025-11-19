@@ -2,6 +2,8 @@ import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 import { Report, ReportDetail } from '@/types/domain';
 import { mockReports, mockReportDetail } from '@/mocks/reports';
+import { getUser, getRole } from '@/services/auth';
+import { getMyProjects } from '@/services/projects';
 
 interface ApiReport {
   id: string;
@@ -46,15 +48,40 @@ interface ApiReportDetail {
 export async function listReports(projectId?: string, taskId?: string): Promise<(Report & { taskId?: string; taskTitle?: string })[]> {
   if (USE_MOCKS) return Promise.resolve(mockReports);
   
+  const user = getUser();
+  const role = getRole();
+  const ensuredEmployeeId = await (await import('@/services/auth')).ensureEmployeeId();
+  
   const params = new URLSearchParams();
   if (projectId) params.append('projectId', projectId);
   if (taskId) params.append('taskId', taskId);
+  
   const queryString = params.toString();
   const url = queryString ? `/reports?${queryString}` : '/reports';
   
   const apiReports = await fetchJson<ApiReport[]>(url);
   
-  return apiReports.map((r): Report & { taskId?: string; taskTitle?: string } => ({
+  // Filtrar en el cliente según el rol
+  let filteredReports = apiReports;
+  const currentAuthorId = user ? (user.employeeId || ensuredEmployeeId || user.id) : ensuredEmployeeId || null;
+  
+  if (role === 'worker' && currentAuthorId) {
+    // Worker (sin privilegios): solo sus propios reportes
+    const authorKey = String(currentAuthorId);
+    filteredReports = apiReports.filter(r => String(r.authorId ?? '') === authorKey);
+  } else if (role === 'supervisor' && !projectId) {
+    // Supervisor (con privilegios): solo reportes de sus proyectos
+    try {
+      const myProjects = await getMyProjects();
+      const projectIds = myProjects.map(p => p.id);
+      filteredReports = apiReports.filter(r => r.projectId && projectIds.includes(r.projectId));
+    } catch (error) {
+      console.error('Error filtering reports by projects:', error);
+      filteredReports = apiReports;
+    }
+  }
+  
+  return filteredReports.map((r): Report & { taskId?: string; taskTitle?: string } => ({
     id: r.id,
     title: r.title,
     project: r.project || 'Sin proyecto',
@@ -113,7 +140,7 @@ export interface ReportMaterial {
 
 export async function createReport(payload: {
   projectId: string;
-  taskId: string | number;
+  taskId?: string | number;
   authorId: string | number;
   title: string;
   description: string;
@@ -134,4 +161,3 @@ export async function createReport(payload: {
   
   return { id: response.id };
 }
-

@@ -73,7 +73,7 @@ export default function ReportsScreen() {
           <Text style={styles.title}>Reportes</Text>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => router.push('/create-report')}
+            onPress={() => router.push('/select-project-type')}
           >
             <Plus size={24} color="#FFFFFF" />
           </TouchableOpacity>
