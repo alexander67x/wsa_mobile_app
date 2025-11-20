@@ -10,6 +10,7 @@ import {
   MaterialRequestStatus,
 } from '@/types/domain';
 import { materialCatalog, materialRequests } from '@/mocks/materials';
+import { getMyProjects } from '@/services/projects';
 
 interface ApiCatalogItem {
   id: number | string;
@@ -342,7 +343,25 @@ export async function listMaterialRequests(params: ListMaterialRequestsParams = 
     queryString ? `/materials/requests?${queryString}` : '/materials/requests'
   );
 
-  return apiRequests.map(mapMaterialRequest);
+  const mappedRequests = apiRequests.map(mapMaterialRequest);
+
+  // Filtrar en cliente para que el usuario solo vea
+  // solicitudes de proyectos a los que está asignado
+  if (!params.projectId) {
+    try {
+      const myProjects = await getMyProjects();
+      const projectIds = new Set(myProjects.map(p => p.id));
+
+      return mappedRequests.filter(request =>
+        request.projectId ? projectIds.has(request.projectId) : true
+      );
+    } catch (error) {
+      console.error('Error filtering material requests by projects:', error);
+      return mappedRequests;
+    }
+  }
+
+  return mappedRequests;
 }
 
 export async function getMaterialRequest(id: string): Promise<MaterialRequestDetail> {

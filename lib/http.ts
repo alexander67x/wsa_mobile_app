@@ -41,7 +41,8 @@ export async function fetchJson<R = unknown, B = unknown>(path: string, opts: Fe
   try { json = text ? JSON.parse(text) : null; } catch { /* ignore */ }
 
   if (!res.ok) {
-    const message = json?.message || res.statusText || 'Request failed';
+    const detail = json?.message || json?.error;
+    const message = detail || res.statusText || 'Request failed';
     throw new Error(`${res.status} ${message}`);
   }
 

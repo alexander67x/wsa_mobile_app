@@ -1,10 +1,43 @@
-import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function RootLayout() {
   useFrameworkReady();
+  const router = useRouter();
+
+  useEffect(() => {
+    const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notificación recibida:', notification);
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('El usuario abrió la notificación:', response);
+      const data = response.notification.request.content.data as { action?: string; id?: string } | undefined;
+
+      if (data?.action === 'open_request' && data.id) {
+        router.push({
+          pathname: '/material-request-detail',
+          params: { id: String(data.id) },
+        });
+      }
+    });
+
+    return () => {
+      receivedSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, [router]);
 
   return (
     <>

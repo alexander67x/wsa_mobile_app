@@ -21,12 +21,7 @@ import {
     XCircle,
 } from 'lucide-react-native';
 
-import {
-    approveMaterialRequest,
-    deliverMaterialRequest,
-    getMaterialRequest,
-    rejectMaterialRequest,
-} from '@/services/materials';
+import { deliverMaterialRequest, getMaterialRequest } from '@/services/materials';
 import type { MaterialRequestDetail } from '@/types/domain';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,7 +45,7 @@ type DeliveryInput = {
     observations: string;
 };
 
-type ActionState = 'approve' | 'reject' | 'deliver' | null;
+type ActionState = 'deliver' | null;
 
 export default function MaterialRequestDetailScreen() {
     const router = useRouter();
@@ -61,8 +56,6 @@ export default function MaterialRequestDetailScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [actionState, setActionState] = useState<ActionState>(null);
-    const [approveNotes, setApproveNotes] = useState('');
-    const [rejectNotes, setRejectNotes] = useState('');
     const [deliveryInputs, setDeliveryInputs] = useState<Record<string, DeliveryInput>>({});
     const [globalDeliveryNotes, setGlobalDeliveryNotes] = useState('');
 
@@ -103,46 +96,19 @@ export default function MaterialRequestDetailScreen() {
         loadDetail();
     }, [loadDetail]);
 
-    const handleApprove = useCallback(async () => {
-        if (!detail || !requestId) return;
-        setActionState('approve');
-        try {
-            const updated = await approveMaterialRequest(requestId, {
-                observations: approveNotes.trim() || undefined,
-            });
-            setDetail(updated);
-            setApproveNotes('');
-            Alert.alert('Solicitud aprobada', 'La solicitud fue aprobada correctamente.');
-        } catch (error) {
-            console.error(error);
-            Alert.alert('Error', 'No se pudo aprobar la solicitud.');
-        } finally {
-            setActionState(null);
-        }
-    }, [approveNotes, detail, requestId]);
+    const handleApprove = useCallback(() => {
+        Alert.alert(
+            'Acción no disponible',
+            'La aprobación de solicitudes solo se puede realizar desde la plataforma web.'
+        );
+    }, []);
 
-    const handleReject = useCallback(async () => {
-        if (!detail || !requestId) return;
-        if (!rejectNotes.trim()) {
-            Alert.alert('Observaciones requeridas', 'Ingresa el motivo del rechazo.');
-            return;
-        }
-
-        setActionState('reject');
-        try {
-            const updated = await rejectMaterialRequest(requestId, {
-                observations: rejectNotes.trim(),
-            });
-            setDetail(updated);
-            setRejectNotes('');
-            Alert.alert('Solicitud rechazada', 'La solicitud fue rechazada.');
-        } catch (error) {
-            console.error(error);
-            Alert.alert('Error', 'No se pudo rechazar la solicitud.');
-        } finally {
-            setActionState(null);
-        }
-    }, [detail, rejectNotes, requestId]);
+    const handleReject = useCallback(() => {
+        Alert.alert(
+            'Acción no disponible',
+            'El rechazo de solicitudes solo se puede realizar desde la plataforma web.'
+        );
+    }, []);
 
     const deliverableItems = useMemo(() => detail?.items ?? [], [detail?.items]);
 
@@ -293,7 +259,7 @@ export default function MaterialRequestDetailScreen() {
                                     </View>
                                     <Text style={styles.pendingLabel}>Pendiente: {pendingLabel}</Text>
 
-                                    {detail.status !== 'delivered' && detail.status !== 'rejected' ? (
+                                    {detail.status === 'sent' ? (
                                         <View style={styles.deliveryForm}>
                                             <Text style={styles.deliveryFormLabel}>Registrar entrega</Text>
                                             <View style={styles.deliveryInputsRow}>
@@ -392,7 +358,7 @@ export default function MaterialRequestDetailScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Acciones</Text>
 
-                        {(detail.status === 'pending' || detail.status === 'draft') && (
+                        {false && (
                             <View style={styles.card}>
                                 <Text style={styles.cardTitle}>Aprobar solicitud</Text>
                                 <Text style={styles.cardSubtitle}>Opcionalmente agrega observaciones para la aprobación.</Text>
@@ -417,7 +383,7 @@ export default function MaterialRequestDetailScreen() {
                             </View>
                         )}
 
-                        {(detail.status === 'pending' || detail.status === 'draft' || detail.status === 'approved') && (
+                        {false && (
                             <View style={styles.card}>
                                 <Text style={styles.cardTitle}>Rechazar solicitud</Text>
                                 <Text style={styles.cardSubtitle}>Indica el motivo del rechazo para notificar al solicitante.</Text>
@@ -442,7 +408,7 @@ export default function MaterialRequestDetailScreen() {
                             </View>
                         )}
 
-                        {(detail.status === 'approved' || detail.status === 'sent') && (
+                        {detail.status === 'sent' && (
                             <View style={styles.card}>
                                 <Text style={styles.cardTitle}>Registrar entregas</Text>
                                 <Text style={styles.cardSubtitle}>

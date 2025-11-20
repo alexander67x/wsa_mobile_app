@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Eye, EyeOff, User, Lock } from 'lucide-react-native';
+import { registerDevicePushToken } from '@/services/notifications';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -30,7 +31,10 @@ export default function LoginScreen() {
     try {
       const Auth = await import('@/services/auth');
       const { token, role } = await Auth.login(username, password);
-      if (token) router.replace(role === 'worker' ? '/(worker)' : '/(tabs)');
+      if (token) {
+        await registerDevicePushToken();
+        router.replace(role === 'worker' ? '/(worker)' : '/(tabs)');
+      }
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Credenciales invalidas');
     } finally {
