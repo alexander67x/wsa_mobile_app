@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  eas:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.eas-cli
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ./docker/cache/eas:/root/.eas
+      - ./docker/cache/expo:/root/.expo
+      - ./docker/cache/android:/root/.android
+      - ./docker/cache/gradle:/root/.gradle
+      - ${DOCKER_SOCK_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+    environment:
+      # Default build profile can be overridden per-invocation with EAS_BUILD_PROFILE
+      - EAS_BUILD_PROFILE=preview
+      - NODE_ENV=development
+    tty: true

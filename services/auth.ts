@@ -2,9 +2,12 @@ import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 
 type AuthUser = { id: string; name: string; role: 'supervisor' | 'worker'; employeeId?: string };
+type ApiRolePayload = { id?: string | number; nombre?: string; descripcion?: string; slug?: string | null } | string | null;
 
 let memoryToken: string | null = null;
 let memoryRole: 'supervisor' | 'worker' | null = null;
+let memoryRoleSlug: string | null = null;
+let memoryPermissions: string[] = [];
 let memoryUser: AuthUser | null = null;
 
 function extractEmployeeId(source: any): string | undefined {
@@ -25,6 +28,35 @@ function extractEmployeeId(source: any): string | undefined {
   if (raw === undefined || raw === null) return undefined;
   const asNumber = Number(raw);
   return Number.isFinite(asNumber) ? String(asNumber) : String(raw);
+}
+
+function mapRoleSlugToLegacy(slug: string | null): 'supervisor' | 'worker' {
+  if (!slug) return 'worker';
+  const supervisorSlugs = ['adquisiciones', 'gerencia', 'responsable_proyecto', 'supervisor'];
+  return supervisorSlugs.includes(slug) ? 'supervisor' : 'worker';
+}
+
+function normalizeRoleSlug(role: ApiRolePayload): string | null {
+  if (!role) return null;
+  if (typeof role === 'string') {
+    return role.trim().toLowerCase().replace(/\s+/g, '_');
+  }
+  if (role.slug) {
+    return String(role.slug).trim().toLowerCase();
+  }
+  if (role.nombre) {
+    return role.nombre.trim().toLowerCase().replace(/\s+/g, '_');
+  }
+  return null;
+}
+
+function hydratePermissions(list?: string[] | null) {
+  memoryPermissions = Array.from(new Set(list ?? [])).filter((item): item is string => typeof item === 'string');
+}
+
+function hydrateRoleState(rolePayload: ApiRolePayload) {
+  memoryRoleSlug = normalizeRoleSlug(rolePayload);
+  memoryRole = mapRoleSlugToLegacy(memoryRoleSlug);
 }
 
 export async function login(username: string, password: string): Promise<{ token: string; role: 'supervisor' | 'worker'; user: { id: string; name: string; employeeId?: string } }>{
@@ -53,7 +85,7 @@ export async function login(username: string, password: string): Promise<{ token
   }
   
   try {
-    const response = await fetchJson<{ token: string; role: string; user: { id: string; name: string } }, { email: string; password: string }>(
+    const response = await fetchJson<{ token: string; role: ApiRolePayload; permissions?: string[]; user: { id: string; name: string } }, { email: string; password: string }>(
       '/auth/login',
       {
         method: 'POST',
@@ -63,21 +95,19 @@ export async function login(username: string, password: string): Promise<{ token
 
     // Save token first
     memoryToken = response.token;
+    hydrateRoleState(response.role ?? null);
+    hydratePermissions(response.permissions);
     // Try to fetch /auth/me to get the role object (new API behavior)
     try {
-      const me = await fetchJson<{ id: string; name: string; role: { id: string; nombre: string; descripcion?: string } | null } & Record<string, any>>('/auth/me');
-      // Map API role names to our internal roles
-      const apiRoleName = me.role?.nombre?.toLowerCase() || '';
-      const mappedRole = apiRoleName === 'administrador' ? 'supervisor' : apiRoleName === 'encargado de obra' ? 'worker' : 'worker';
+      const me = await fetchJson<{ id: string; name: string; role: ApiRolePayload; permissions?: string[] } & Record<string, any>>('/auth/me');
+      hydrateRoleState(me.role ?? response.role ?? null);
+      hydratePermissions(me.permissions ?? response.permissions ?? []);
 
-      memoryRole = mappedRole as 'supervisor' | 'worker';
-      memoryUser = { id: me.id || response.user.id, name: me.name || response.user.name, role: memoryRole, employeeId: extractEmployeeId(me) || extractEmployeeId(response.user) };
+      memoryUser = { id: me.id || response.user.id, name: me.name || response.user.name, role: memoryRole ?? 'worker', employeeId: extractEmployeeId(me) || extractEmployeeId(response.user) };
 
-      return { token: response.token, role: memoryRole, user: { id: memoryUser.id, name: memoryUser.name, employeeId: memoryUser.employeeId } };
+      return { token: response.token, role: memoryRole ?? 'worker', user: { id: memoryUser.id, name: memoryUser.name, employeeId: memoryUser.employeeId } };
     } catch (meErr) {
-      // If /auth/me fails, fallback to response.role or default to worker
-      const fallbackRole = (response.role === 'supervisor' ? 'supervisor' : 'worker') as 'supervisor' | 'worker';
-      memoryRole = fallbackRole;
+      const fallbackRole = memoryRole ?? 'worker';
       memoryUser = { id: response.user.id, name: response.user.name, role: fallbackRole, employeeId: extractEmployeeId(response.user) };
       return { token: response.token, role: fallbackRole, user: { id: response.user.id, name: response.user.name, employeeId: memoryUser.employeeId } };
     }
@@ -85,7 +115,7 @@ export async function login(username: string, password: string): Promise<{ token
     // If first attempt failed and we added @example.com, try with username as-is
     if (email !== username) {
       try {
-        const response = await fetchJson<{ token: string; role: string; user: { id: string; name: string } }, { email: string; password: string }>(
+        const response = await fetchJson<{ token: string; role: ApiRolePayload; permissions?: string[]; user: { id: string; name: string } }, { email: string; password: string }>(
           '/auth/login',
           {
             method: 'POST',
@@ -93,18 +123,18 @@ export async function login(username: string, password: string): Promise<{ token
           }
         );
         memoryToken = response.token;
+        hydrateRoleState(response.role ?? null);
+        hydratePermissions(response.permissions ?? []);
         try {
-          const me = await fetchJson<{ id: string; name: string; role: { id: string; nombre: string; descripcion?: string } | null } & Record<string, any>>('/auth/me');
-          const apiRoleName = me.role?.nombre?.toLowerCase() || '';
-          const mappedRole = apiRoleName === 'administrador' ? 'supervisor' : apiRoleName === 'encargado de obra' ? 'worker' : 'worker';
+          const me = await fetchJson<{ id: string; name: string; role: ApiRolePayload; permissions?: string[] } & Record<string, any>>('/auth/me');
+          hydrateRoleState(me.role ?? response.role ?? null);
+          hydratePermissions(me.permissions ?? response.permissions ?? []);
 
-          memoryRole = mappedRole as 'supervisor' | 'worker';
-          memoryUser = { id: me.id || response.user.id, name: me.name || response.user.name, role: memoryRole, employeeId: extractEmployeeId(me) || extractEmployeeId(response.user) };
+          memoryUser = { id: me.id || response.user.id, name: me.name || response.user.name, role: memoryRole ?? 'worker', employeeId: extractEmployeeId(me) || extractEmployeeId(response.user) };
 
-          return { token: response.token, role: memoryRole, user: { id: memoryUser.id, name: memoryUser.name, employeeId: memoryUser.employeeId } };
+          return { token: response.token, role: memoryRole ?? 'worker', user: { id: memoryUser.id, name: memoryUser.name, employeeId: memoryUser.employeeId } };
         } catch (meErr) {
-          const fallbackRole = (response.role === 'supervisor' ? 'supervisor' : 'worker') as 'supervisor' | 'worker';
-          memoryRole = fallbackRole;
+          const fallbackRole = memoryRole ?? 'worker';
           memoryUser = { id: response.user.id, name: response.user.name, role: fallbackRole, employeeId: extractEmployeeId(response.user) };
           return { token: response.token, role: fallbackRole, user: { id: response.user.id, name: response.user.name, employeeId: memoryUser.employeeId } };
         }
@@ -116,10 +146,12 @@ export async function login(username: string, password: string): Promise<{ token
   }
 }
 
-export async function fetchMe(): Promise<({ id: string; name: string; role: { id: string; nombre: string; descripcion?: string } | null } & Record<string, any>) | null> {
+export async function fetchMe(): Promise<({ id: string; name: string; role: ApiRolePayload; permissions?: string[] } & Record<string, any>) | null> {
   if (USE_MOCKS || !memoryToken) return null;
   try {
-    const me = await fetchJson<{ id: string; name: string; role: { id: string; nombre: string; descripcion?: string } | null } & Record<string, any>>('/auth/me', { token: memoryToken });
+    const me = await fetchJson<{ id: string; name: string; role: ApiRolePayload; permissions?: string[] } & Record<string, any>>('/auth/me', { token: memoryToken });
+    hydrateRoleState(me.role ?? null);
+    hydratePermissions(me.permissions ?? []);
     return me;
   } catch {
     return null;
@@ -139,6 +171,8 @@ export async function logout(): Promise<void> {
   }
   memoryToken = null;
   memoryRole = null;
+  memoryRoleSlug = null;
+  memoryPermissions = [];
   memoryUser = null;
 }
 
@@ -148,6 +182,18 @@ export function getToken(): string | null {
 
 export function getRole(): 'supervisor' | 'worker' | null {
   return memoryRole;
+}
+
+export function getRoleSlug(): string | null {
+  return memoryRoleSlug;
+}
+
+export function getPermissions(): string[] {
+  return memoryPermissions;
+}
+
+export function hasPermission(permission: string): boolean {
+  return memoryPermissions.includes(permission);
 }
 
 export function getUser(): AuthUser | null {
@@ -164,8 +210,9 @@ export async function ensureEmployeeId(): Promise<string | undefined> {
     if (me && memoryUser) {
       memoryUser = { ...memoryUser, employeeId };
     } else if (me) {
-      const apiRoleName = me.role?.nombre?.toLowerCase() || '';
-      const mappedRole = apiRoleName === 'administrador' ? 'supervisor' : apiRoleName === 'encargado de obra' ? 'worker' : 'worker';
+      hydrateRoleState(me.role ?? null);
+      hydratePermissions(me.permissions ?? []);
+      const mappedRole = memoryRole ?? 'worker';
       memoryUser = {
         id: me.id,
         name: me.name,

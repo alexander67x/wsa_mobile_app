@@ -1,0 +1,29 @@
+# Minimal CLI image used to run EAS commands from Docker Desktop
+FROM node:20-bullseye
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+        openssh-client \
+        python3 \
+        python3-pip \
+        build-essential \
+        openjdk-17-jre-headless \
+        unzip \
+        ca-certificates \
+        jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Corepack keeps npm/pnpm/yarn versions in sync with the repo lockfile
+RUN corepack enable \
+    && npm install --global eas-cli@latest
+
+WORKDIR /app
+
+# Default to bash so we can execute arbitrary commands via docker compose run
+ENTRYPOINT ["/bin/bash","-lc"]
+CMD ["bash"]

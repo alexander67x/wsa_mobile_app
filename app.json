@@ -29,6 +29,20 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d1395a71-0165-48de-969a-58bba9e95f1b"
+      }
+    },
+    "owner": "hon123",
+    "android": {
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.hon123.boltexponativewind"
     }
   }
 }
