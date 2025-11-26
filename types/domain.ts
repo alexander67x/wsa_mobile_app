@@ -6,7 +6,10 @@ export interface Project {
   location: string;
   progress: number;
   status: 'active' | 'pending' | 'completed';
-  dueDate: string;
+  dueDate: string | null;
+  deadline?: string | null;
+  budget?: number | null;
+  members?: ProjectMember[];
   tasksCount?: number;
   reportsCount?: number;
 }
@@ -17,14 +20,22 @@ export interface ProjectDetail {
   location: string;
   progress: number;
   status: 'active' | 'pending' | 'completed';
-  startDate: string;
-  endDate: string;
-  budget: string;
+  startDate: string | null;
+  endDate: string | null;
+  deadline: string | null;
+  budget: number | null;
   manager: string;
   team: number;
+  members: ProjectMember[];
   tasks: Array<{ id: Id; title: string; status: 'pending' | 'in_progress' | 'completed'; assignee: string; dueDate: string }>;
   reports: Array<{ id: Id; title: string; date: string; type: 'progress' | 'incident' | 'quality'; status: 'pending' | 'approved' | 'rejected' }>;
   materials: Array<{ id: Id; name: string; quantity: number; unit: string; status: 'requested' | 'approved' | 'delivered' }>;
+}
+
+export interface ProjectMember {
+  id: Id;
+  name: string;
+  role?: string | null;
 }
 
 export interface Report {

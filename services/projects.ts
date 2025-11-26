@@ -3,18 +3,32 @@ import { fetchJson } from '@/lib/http';
 import { Project, ProjectDetail } from '@/types/domain';
 import { mockProjects, mockProjectDetail } from '@/mocks/projects';
 
+interface ApiProjectMember {
+  id: string;
+  name: string;
+  role?: string | null;
+}
+
 interface ApiProject {
   id: string;
   name: string;
   client: string | null;
   startDate: string | null;
   endDate: string | null;
+  deadline: string | null;
+  budget: number | null;
+  members?: ApiProjectMember[];
 }
 
 interface ApiProjectDetail {
   id: string;
   name: string;
   client: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  deadline: string | null;
+  budget: number | null;
+  members?: ApiProjectMember[];
   tasks: Array<{
     id: string;
     title: string;
@@ -35,7 +49,14 @@ export async function listProjects(): Promise<Project[]> {
     progress: 0, // API doesn't provide progress, default to 0
     status: p.endDate && new Date(p.endDate) < new Date() ? 'completed' : 
            p.startDate && new Date(p.startDate) > new Date() ? 'pending' : 'active',
-    dueDate: p.endDate || '',
+    dueDate: p.deadline || p.endDate,
+    deadline: p.deadline || p.endDate,
+    budget: p.budget,
+    members: p.members?.map(member => ({
+      id: member.id,
+      name: member.name,
+      role: member.role ?? null,
+    })) ?? [],
     tasksCount: 0,
     reportsCount: 0,
   }));
@@ -53,11 +74,17 @@ export async function getProject(id: string): Promise<ProjectDetail> {
     location: apiProject.client || 'Sin ubicación',
     progress: 0, // API doesn't provide progress
     status: 'active',
-    startDate: '',
-    endDate: '',
-    budget: '',
+    startDate: apiProject.startDate,
+    endDate: apiProject.endDate,
+    deadline: apiProject.deadline || apiProject.endDate,
+    budget: apiProject.budget,
     manager: '',
-    team: 0,
+    team: apiProject.members?.length ?? 0,
+    members: apiProject.members?.map(member => ({
+      id: member.id,
+      name: member.name,
+      role: member.role ?? null,
+    })) ?? [],
     tasks: apiProject.tasks.map(t => ({
       id: t.id,
       title: t.title,
@@ -126,9 +153,15 @@ export async function getMyProjects(): Promise<Project[]> {
     progress: 0, // API doesn't provide progress, default to 0
     status: p.endDate && new Date(p.endDate) < new Date() ? 'completed' : 
            p.startDate && new Date(p.startDate) > new Date() ? 'pending' : 'active',
-    dueDate: p.endDate || '',
+    dueDate: p.deadline || p.endDate,
+    deadline: p.deadline || p.endDate,
+    budget: p.budget,
+    members: p.members?.map(member => ({
+      id: member.id,
+      name: member.name,
+      role: member.role ?? null,
+    })) ?? [],
     tasksCount: 0,
     reportsCount: 0,
   }));
 }
-

@@ -15,9 +15,15 @@ export const mockProjectDetail: ProjectDetail = {
   status: 'active',
   startDate: '2023-10-01',
   endDate: '2024-03-15',
-  budget: '$1,250,000',
+  deadline: '2024-03-15',
+  budget: 1250000,
   manager: 'Supervisor J. Salazar',
   team: 10,
+  members: [
+    { id: 'emp1', name: 'Luis M.', role: 'Instalador' },
+    { id: 'emp2', name: 'Karla G.', role: 'Técnico' },
+    { id: 'emp3', name: 'R. Torres', role: 'Supervisor' },
+  ],
   tasks: [
     { id: 't1', title: 'Tendido de cable UTP – Torre A', status: 'in_progress', assignee: 'Luis M.', dueDate: '2024-02-15' },
     { id: 't2', title: 'Montaje de cámaras – Lobby', status: 'pending', assignee: 'Karla G.', dueDate: '2024-02-20' },

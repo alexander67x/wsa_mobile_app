@@ -1,21 +1,51 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Mail, FileText } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { COLORS } from '@/theme';
+import { enviarCorreoAdmin, enviarCorreoEmpleado } from '@/services/emailService';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [reason, setReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!email) {
-      Alert.alert('Falta correo', 'Coloca tu gmail para continuar.');
+  const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value.trim());
+
+  const handleSubmit = async () => {
+    if (!email.trim()) {
+      Alert.alert('Falta correo', 'Coloca tu correo para continuar.');
       return;
     }
-    Alert.alert('Solicitud enviada', 'Revisaremos tu solicitud y te contactaremos.');
-    router.back();
+    if (!isValidEmail(email)) {
+      Alert.alert('Correo inválido', 'El correo que ingresaste no parece válido.');
+      return;
+    }
+    if (!reason.trim()) {
+      Alert.alert('Falta justificación', 'Cuéntanos por qué necesitas restablecer el acceso.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const cleanEmail = email.trim();
+      const cleanReason = reason.trim();
+
+      await Promise.all([
+        enviarCorreoEmpleado(cleanEmail, cleanReason),
+        enviarCorreoAdmin(cleanEmail, cleanReason),
+      ]);
+      Alert.alert('Solicitud enviada', 'Revisaremos tu solicitud y te contactaremos en breve.');
+      setEmail('');
+      setReason('');
+      router.back();
+    } catch (error: any) {
+      console.error('[forgot-password] Error al enviar solicitud', error);
+      Alert.alert('Error', 'No se pudo enviar tu solicitud. Intenta nuevamente en unos minutos.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -58,8 +88,8 @@ export default function ForgotPasswordScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitText}>Enviar solicitud</Text>
+        <TouchableOpacity style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Enviar solicitud</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -78,6 +108,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16, color: COLORS.text },
   textArea: { minHeight: 100, textAlignVertical: 'top', paddingTop: 6 },
   submitButton: { marginTop: 28, backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: COLORS.primaryShadow, shadowOpacity: 0.16, shadowOffset: { width: 0, height: 6 }, shadowRadius: 10, elevation: 4 },
+  submitButtonDisabled: { opacity: 0.6 },
   submitText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
-

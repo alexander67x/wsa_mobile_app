@@ -3,38 +3,14 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { router, useLocalSearchParams } from 'expo-router';
 import { getProject } from '@/services/projects';
 import type { ProjectDetail } from '@/types/domain';
-import { ArrowLeft, Calendar, MapPin, Users, ChartBar as BarChart3, Plus, FileText } from 'lucide-react-native';
+import { ArrowLeft, Calendar, MapPin, Users, User, ChartBar as BarChart3, FileText } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
-
-interface TabData {
-  tasks: Array<{
-    id: string;
-    title: string;
-    status: 'pending' | 'in_progress' | 'completed';
-    assignee: string;
-    dueDate: string;
-  }>;
-  reports: Array<{
-    id: string;
-    title: string;
-    date: string;
-    type: 'progress' | 'incident' | 'quality';
-    status: 'pending' | 'approved' | 'rejected';
-  }>;
-  materials: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    unit: string;
-    status: 'requested' | 'approved' | 'delivered';
-  }>;
-}
 
 export default function ProjectDetailScreen() {
   const { projectId } = useLocalSearchParams();
   const [data, setData] = useState<ProjectDetail | null>(null);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'reports' | 'materials'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'reports' | 'team'>('tasks');
 
   useEffect(() => {
     getProject(String(projectId || '1')).then(setData).catch(() => setData(null));
@@ -47,6 +23,7 @@ export default function ProjectDetailScreen() {
       </View>
     );
   }
+  const members = data.members ?? [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -55,6 +32,31 @@ export default function ProjectDetailScreen() {
       case 'rejected': return '#EF4444';
       default: return '#6B7280';
     }
+  };
+
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return 'Sin fecha';
+    try {
+      return new Date(value).toLocaleDateString('es-PE', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return value;
+    }
+  };
+
+  const formatBudget = (value: number | null | undefined) => {
+    if (value == null) return 'Sin registro';
+    if (typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function') {
+      return new Intl.NumberFormat('es-PE', {
+        style: 'currency',
+        currency: 'PEN',
+        minimumFractionDigits: 2,
+      }).format(value);
+    }
+    return `S/ ${value.toFixed(2)}`;
   };
 
   const getStatusText = (status: string, type: string) => {
@@ -118,17 +120,17 @@ export default function ProjectDetailScreen() {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Calendar size={20} color={COLORS.primary} />
-            <Text style={styles.statValue}>{data.endDate}</Text>
+            <Text style={styles.statValue}>{formatDate(data.deadline || data.endDate)}</Text>
             <Text style={styles.statLabel}>Fecha límite</Text>
           </View>
           <View style={styles.statCard}>
             <Users size={20} color={COLORS.primary} />
-            <Text style={styles.statValue}>{data.team}</Text>
+            <Text style={styles.statValue}>{members.length}</Text>
             <Text style={styles.statLabel}>Miembros</Text>
           </View>
           <View style={styles.statCard}>
             <BarChart3 size={20} color={COLORS.primary} />
-            <Text style={styles.statValue}>{data.budget}</Text>
+            <Text style={styles.statValue}>{formatBudget(data.budget)}</Text>
             <Text style={styles.statLabel}>Presupuesto</Text>
           </View>
         </View>
@@ -137,7 +139,7 @@ export default function ProjectDetailScreen() {
           {[
             { key: 'tasks', label: 'Tareas', count: data.tasks.length },
             { key: 'reports', label: 'Reportes', count: data.reports.length },
-            { key: 'materials', label: 'Equipos', count: data.materials.length },
+            { key: 'team', label: 'Equipo', count: members.length || 1 },
           ].map(tab => (
             <TouchableOpacity
               key={tab.key}
@@ -191,20 +193,43 @@ export default function ProjectDetailScreen() {
                     <Text style={styles.listItemDate}>{report.date}</Text>
                   </TouchableOpacity>
                 ));
-              case 'materials':
-                return data.materials.map(material => (
-                  <View key={material.id} style={styles.listItem}>
-                    <View style={styles.listItemHeader}>
-                      <Text style={styles.listItemTitle}>{material.name}</Text>
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(material.status) + '20' }]}>
-                        <Text style={[styles.statusText, { color: getStatusColor(material.status) }]}>
-                          {getStatusText(material.status, 'material')}
-                        </Text>
+              case 'team':
+                return (
+                  <View style={styles.teamContent}>
+                    <View style={styles.infoCard}>
+                      <Text style={styles.sectionTitle}>Cronograma</Text>
+                      <View style={styles.infoRow}>
+                        <View style={styles.infoItem}>
+                          <Text style={styles.infoLabel}>Inicio</Text>
+                          <Text style={styles.infoValue}>{formatDate(data.startDate)}</Text>
+                        </View>
+                        <View style={styles.infoItem}>
+                          <Text style={styles.infoLabel}>Fin estimado</Text>
+                          <Text style={styles.infoValue}>{formatDate(data.endDate)}</Text>
+                        </View>
                       </View>
                     </View>
-                    <Text style={styles.listItemSubtitle}>Cantidad: {material.quantity} {material.unit}</Text>
+
+                    <View style={styles.infoCard}>
+                      <Text style={styles.sectionTitle}>Equipo asignado</Text>
+                      {members.length === 0 ? (
+                        <Text style={styles.emptyMembersText}>Aún no hay colaboradores asignados.</Text>
+                      ) : (
+                        members.map(member => (
+                          <View key={member.id} style={styles.memberRow}>
+                            <View style={styles.memberAvatar}>
+                              <User size={16} color={COLORS.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.memberName}>{member.name}</Text>
+                              {member.role ? <Text style={styles.memberRole}>{member.role}</Text> : null}
+                            </View>
+                          </View>
+                        ))
+                      )}
+                    </View>
                   </View>
-                ));
+                );
             }
           })()}
         </ScrollView>
@@ -241,12 +266,24 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, backgroundColor: '#FFFFFF', padding: 16, marginHorizontal: 4, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   statValue: { fontSize: 16, fontWeight: '600', color: '#1F2937', marginTop: 8, marginBottom: 4 },
   statLabel: { fontSize: 12, color: '#6B7280', textAlign: 'center' },
+  infoCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 12 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
+  infoItem: { flex: 1 },
+  infoLabel: { fontSize: 12, color: '#6B7280', marginBottom: 4 },
+  infoValue: { fontSize: 14, fontWeight: '500', color: '#1F2937' },
+  memberRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  memberAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  memberName: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
+  memberRole: { fontSize: 12, color: '#6B7280' },
+  emptyMembersText: { fontSize: 13, color: '#9CA3AF' },
   tabsContainer: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 4, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
   activeTab: { backgroundColor: COLORS.primary },
   tabText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
   activeTabText: { color: '#FFFFFF' },
   tabContent: { flex: 1, marginBottom: 20 },
+  teamContent: { },
   listItem: { backgroundColor: '#FFFFFF', padding: 16, marginBottom: 12, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   listItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   listItemTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937', flex: 1, marginRight: 12 },

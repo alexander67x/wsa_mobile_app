@@ -7,17 +7,6 @@ import type { Project } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
 
-interface Project {
-  id: string;
-  name: string;
-  location: string;
-  progress: number;
-  status: 'active' | 'pending' | 'completed';
-  dueDate: string;
-  tasksCount: number;
-  reportsCount: number;
-}
-
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -160,11 +149,10 @@ export default function HomeScreen() {
                 />
               </View>
             </View>
-
             <View style={styles.projectStats}>
               <View style={styles.statItem}>
                 <Calendar size={16} color="#6B7280" />
-                <Text style={styles.statText}>Vence: {project.dueDate}</Text>
+                <Text style={styles.statText}>Vence: {project.dueDate || 'Sin fecha'}</Text>
               </View>
               <View style={styles.statItem}>
                 <BarChart3 size={16} color="#6B7280" />

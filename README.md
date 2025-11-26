@@ -51,3 +51,21 @@ Este repo incluye un flujo reproducible para ejecutar `eas build --platform andr
 - Los directorios `docker/cache/*` almacenan cachés de Expo, Gradle y Android para acelerar builds subsecuentes.
 - Si necesitas pasar credenciales de keystore o variables secretas, utiliza `--env-file .env` o `-e CLAVE=valor` al invocar `docker compose run`.
 - El comando usa siempre `--docker`, así que el build real ocurre en la imagen oficial de Expo; el contenedor `eas` solo actúa como wrapper Linux estable.
+
+### Configuración de Resend para "Olvidé mi contraseña"
+
+1. **Variables en `.env`**
+
+   ```bash
+   EXPO_PUBLIC_RESEND_API_KEY=re_XXXXXXXXXXXXXX
+   EXPO_PUBLIC_RESEND_FROM=soporte@alwswsa.shop
+   EXPO_PUBLIC_ADMIN_EMAIL=admin@alwswsa.shop
+   ```
+
+2. **Permitir variables en Expo**
+
+   El archivo `app.config.ts` importa `dotenv/config` y expone `resendKey`, `resendFrom` y `adminEmail` dentro de `expo.extra`, lo que garantiza su disponibilidad en tiempo de ejecución (incluido EAS Build).
+
+3. **Helper de envío**
+
+   `services/emailService.ts` usa la API de Resend para mandar los dos correos (empleado y administración) cuando un usuario solicita restablecer su contraseña.
