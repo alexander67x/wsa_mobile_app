@@ -5,6 +5,7 @@ import { Plus, Calendar, FileText, TriangleAlert as AlertTriangle, CircleCheck a
 import { listReports } from '@/services/reports';
 import type { Report } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 
 export default function ReportsScreen() {
   const [activeFilter, setActiveFilter] = useState('all');
@@ -48,7 +49,7 @@ export default function ReportsScreen() {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'progress': return <BarChart3 size={20} color="#2563EB" />;
+      case 'progress': return <BarChart3 size={20} color={COLORS.primary} />;
       case 'incident': return <AlertTriangle size={20} color="#F59E0B" />;
       case 'quality': return <CheckCircle size={20} color="#10B981" />;
       default: return <FileText size={20} color="#6B7280" />;
@@ -165,20 +166,20 @@ const styles = StyleSheet.create({
   header: { backgroundColor: '#FFFFFF', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#1F2937' },
-  addButton: { backgroundColor: '#2563EB', width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  addButton: { backgroundColor: COLORS.primary, width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   filterContainer: { marginBottom: 16 },
   filterButton: { paddingHorizontal: 16, paddingVertical: 8, marginRight: 12, backgroundColor: '#F3F4F6', borderRadius: 20 },
-  filterButtonActive: { backgroundColor: '#2563EB' },
+  filterButtonActive: { backgroundColor: COLORS.primary },
   filterButtonText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
   filterButtonTextActive: { color: '#FFFFFF' },
   quickActions: { flexDirection: 'row' },
   quickActionButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 12 },
-  quickActionText: { marginLeft: 8, fontSize: 14, fontWeight: '500', color: '#2563EB' },
+  quickActionText: { marginLeft: 8, fontSize: 14, fontWeight: '500', color: COLORS.primary },
   reportsList: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   reportCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   reportHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   typeContainer: { flexDirection: 'row', alignItems: 'center' },
-  typeText: { marginLeft: 8, color: '#2563EB', fontWeight: '600' },
+  typeText: { marginLeft: 8, color: COLORS.primary, fontWeight: '600' },
   statusContainer: { flexDirection: 'row', alignItems: 'center' },
   statusText: { marginLeft: 6, fontWeight: '600' },
   reportTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937', marginBottom: 4 },

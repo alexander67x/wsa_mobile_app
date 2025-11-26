@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert,
 import { router } from 'expo-router';
 import { ArrowLeft, Package, Plus, Minus, Save } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { listCatalog } from '@/services/materials';
@@ -399,15 +400,7 @@ export default function RequestMaterialScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: {
-    backgroundColor: '#2563EB',
-    paddingTop: 52,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
   content: { flex: 1 },
@@ -426,7 +419,7 @@ const styles = StyleSheet.create({
   },
   pickerContainer: { flexDirection: 'row' },
   pickerOption: { paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, backgroundColor: '#F3F4F6', borderRadius: 16 },
-  pickerOptionActive: { backgroundColor: '#2563EB' },
+  pickerOptionActive: { backgroundColor: COLORS.primary },
   pickerOptionText: { color: '#6B7280' },
   pickerOptionTextActive: { color: '#FFFFFF', fontWeight: '600' },
   pickerSku: { color: '#9CA3AF', fontSize: 12 },
@@ -443,7 +436,7 @@ const styles = StyleSheet.create({
   qtyButton: { backgroundColor: '#E5E7EB', padding: 8, borderRadius: 8 },
   qtyInput: { width: 60, height: 40, textAlign: 'center', marginHorizontal: 8, borderColor: '#D1D5DB', borderWidth: 1, borderRadius: 8, color: '#111827' },
   unitText: { marginLeft: 8, color: '#6B7280' },
-  addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, backgroundColor: '#2563EB', padding: 12, borderRadius: 12 },
+  addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, backgroundColor: COLORS.primary, padding: 12, borderRadius: 12 },
   addButtonText: { color: '#FFFFFF', fontWeight: '600', marginLeft: 8 },
   summaryCard: { marginTop: 12, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12 },
   summaryTitle: { fontWeight: '700', marginBottom: 8, color: '#111827' },
@@ -458,7 +451,7 @@ const styles = StyleSheet.create({
   textArea: { borderColor: '#D1D5DB', borderWidth: 1, borderRadius: 12, padding: 12, minHeight: 96, textAlignVertical: 'top', color: '#111827' },
   compactTextArea: { minHeight: 72 },
   footer: { padding: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E5E7EB' },
-  submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563EB', padding: 14, borderRadius: 12 },
+  submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, padding: 14, borderRadius: 12 },
   submitButtonDisabled: { opacity: 0.6 },
   submitButtonText: { color: '#FFFFFF', fontWeight: '700', marginLeft: 8 },
 });

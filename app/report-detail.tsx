@@ -2,6 +2,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'rea
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Calendar, MapPin, User, FileText, Camera, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 import { useEffect, useState } from 'react';
 import { getReport } from '@/services/reports';
 import type { ReportDetail as ReportDetailType } from '@/types/domain';
@@ -163,7 +164,7 @@ export default function ReportDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
   content: { flex: 1 },
@@ -171,8 +172,8 @@ const styles = StyleSheet.create({
   statusHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   statusInfo: { flexDirection: 'row', alignItems: 'center' },
   statusText: { marginLeft: 8, fontSize: 14, fontWeight: '600' },
-  typeBadge: { backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  typeText: { color: '#2563EB', fontWeight: '700' },
+  typeBadge: { backgroundColor: COLORS.primarySurface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  typeText: { color: COLORS.primary, fontWeight: '700' },
   infoCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   reportTitle: { fontSize: 20, fontWeight: '700', color: '#1F2937' },
   reportProject: { fontSize: 14, color: '#6B7280', marginBottom: 8 },

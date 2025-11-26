@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert } fr
 import { router } from 'expo-router';
 import { ArrowLeft, Camera, MapPin, Trash2, Send, Plus } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 
 interface Photo {
   id: string;
@@ -192,7 +193,7 @@ export default function AttachEvidenceScreen() {
             style={styles.addMoreButton}
             onPress={takePhoto}
           >
-            <Plus size={20} color="#2563EB" />
+            <Plus size={20} color={COLORS.primary} />
             <Text style={styles.addMoreButtonText}>Agregar Más Fotos</Text>
           </TouchableOpacity>
           
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   header: {
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -271,13 +272,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cameraButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     width: 120,
     height: 120,
     borderRadius: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#2563EB',
+    shadowColor: COLORS.primaryShadow,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -381,14 +382,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#2563EB',
+    borderColor: COLORS.primary,
     gap: 8,
   },
-  addMoreButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
+  addMoreButtonText: { fontSize: 16, fontWeight: '600', color: COLORS.primary },
   sendButton: {
     backgroundColor: '#10B981',
     flexDirection: 'row',

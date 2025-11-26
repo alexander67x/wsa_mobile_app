@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Clock, MapPin, CircleCheck as CheckCircle, Play, Square, Calendar } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 
 interface CheckInRecord {
   id: string;
@@ -201,7 +202,7 @@ export default function CheckInScreen() {
         {mockRecords.slice(0, 3).map(record => (
           <View key={record.id} style={styles.historyItem}>
             <View style={styles.historyDate}>
-              <Calendar size={16} color="#2563EB" />
+              <Calendar size={16} color={COLORS.primary} />
               <Text style={styles.historyDateText}>{record.date}</Text>
             </View>
             <View style={styles.historyDetails}>
@@ -248,12 +249,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  currentTime: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2563EB',
-    marginBottom: 12,
-  },
+  currentTime: { fontSize: 48, fontWeight: 'bold', color: COLORS.primary, marginBottom: 12 },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -356,12 +352,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2563EB',
-    marginBottom: 4,
-  },
+  statValue: { fontSize: 24, fontWeight: 'bold', color: COLORS.primary, marginBottom: 4 },
   statLabel: {
     fontSize: 12,
     color: '#6B7280',
@@ -392,12 +383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  historyDateText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
+  historyDateText: { marginLeft: 8, fontSize: 14, fontWeight: '600', color: COLORS.primary },
   historyDetails: {
     marginLeft: 24,
   },

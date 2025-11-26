@@ -23,12 +23,13 @@ import {
 
 import { deliverMaterialRequest, getMaterialRequest } from '@/services/materials';
 import type { MaterialRequestDetail } from '@/types/domain';
+import { COLORS } from '@/theme';
 
 const STATUS_COLORS: Record<string, string> = {
     draft: '#6B7280',
     pending: '#F59E0B',
-    approved: '#3B82F6',
-    sent: '#2563EB',
+    approved: COLORS.primaryMuted,
+    sent: COLORS.primary,
     delivered: '#10B981',
     rejected: '#EF4444',
 };
@@ -182,7 +183,7 @@ export default function MaterialRequestDetailScreen() {
 
             {isLoading && !isRefreshing ? (
                 <View style={styles.centerContent}>
-                    <ActivityIndicator size="large" color="#2563EB" />
+                    <ActivityIndicator size="large" color={COLORS.primary} />
                     <Text style={styles.loadingText}>Cargando información...</Text>
                 </View>
             ) : detail ? (
@@ -338,7 +339,7 @@ export default function MaterialRequestDetailScreen() {
                             {detail.deliveries.map(delivery => (
                                 <View key={delivery.id} style={styles.deliveryRecord}>
                                     <View style={styles.deliveryRecordRow}>
-                                        <Truck size={16} color="#2563EB" />
+                                        <Truck size={16} color={COLORS.primary} />
                                         <Text style={styles.deliveryRecordText}>{delivery.quantity} unidades</Text>
                                     </View>
                                     <Text style={styles.deliveryRecordMeta}>
@@ -464,14 +465,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
     },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#EEF2FF',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+    backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primarySurface, alignItems: 'center', justifyContent: 'center' },
     headerTitle: {
         fontSize: 18,
         fontWeight: '600',
@@ -610,12 +604,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#4B5563',
     },
-    pendingLabel: {
-        marginTop: 4,
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#2563EB',
-    },
+    pendingLabel: { marginTop: 4, fontSize: 12, fontWeight: '600', color: COLORS.primary },
     deliveryForm: {
         marginTop: 12,
     },
@@ -689,13 +678,7 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         lineHeight: 18,
     },
-    primaryButton: {
-        marginTop: 12,
-        backgroundColor: '#2563EB',
-        paddingVertical: 12,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
+    primaryButton: { marginTop: 12, backgroundColor: COLORS.primary, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
     primaryButtonText: {
         color: '#FFFFFF',
         fontWeight: '600',

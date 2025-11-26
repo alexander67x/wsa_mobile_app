@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { router } from 'expo-router';
 import { ArrowLeft, Plus, Clock, Play, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 
 interface KanbanTask {
   id: string;
@@ -51,7 +52,7 @@ export default function KanbanScreen() {
   const getColumnIcon = (column: string) => {
     switch (column) {
       case 'pending': return <Clock size={20} color="#F59E0B" />;
-      case 'in_progress': return <Play size={20} color="#2563EB" />;
+      case 'in_progress': return <Play size={20} color={COLORS.primary} />;
       case 'completed': return <CheckCircle size={20} color="#10B981" />;
       default: return null;
     }
@@ -157,7 +158,7 @@ export default function KanbanScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
   content: { flex: 1 },

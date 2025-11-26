@@ -5,6 +5,7 @@ import { getProject } from '@/services/projects';
 import type { ProjectDetail } from '@/types/domain';
 import { ArrowLeft, Calendar, MapPin, Users, ChartBar as BarChart3, Plus, FileText } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 
 interface TabData {
   tasks: Array<{
@@ -97,7 +98,7 @@ export default function ProjectDetailScreen() {
         <View style={styles.projectInfo}>
         <Text style={styles.projectName}>{data.name}</Text>
           <View style={styles.projectLocation}>
-            <MapPin size={16} color="#BFDBFE" />
+            <MapPin size={16} color={COLORS.primaryLight} />
             <Text style={styles.projectLocationText}>{data.location}</Text>
           </View>
         </View>
@@ -116,17 +117,17 @@ export default function ProjectDetailScreen() {
       <View style={styles.content}>
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
-            <Calendar size={20} color="#2563EB" />
+            <Calendar size={20} color={COLORS.primary} />
             <Text style={styles.statValue}>{data.endDate}</Text>
             <Text style={styles.statLabel}>Fecha límite</Text>
           </View>
           <View style={styles.statCard}>
-            <Users size={20} color="#2563EB" />
+            <Users size={20} color={COLORS.primary} />
             <Text style={styles.statValue}>{data.team}</Text>
             <Text style={styles.statLabel}>Miembros</Text>
           </View>
           <View style={styles.statCard}>
-            <BarChart3 size={20} color="#2563EB" />
+            <BarChart3 size={20} color={COLORS.primary} />
             <Text style={styles.statValue}>{data.budget}</Text>
             <Text style={styles.statLabel}>Presupuesto</Text>
           </View>
@@ -210,7 +211,7 @@ export default function ProjectDetailScreen() {
 
         <View style={styles.actionButtons}>
           <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} onPress={() => router.push('/kanban')}>
-            <FileText size={20} color="#2563EB" />
+            <FileText size={20} color={COLORS.primary} />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>Ver Kanban</Text>
           </TouchableOpacity>
         </View>
@@ -221,20 +222,20 @@ export default function ProjectDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
   projectInfo: { marginTop: 16 },
   projectName: { color: '#FFFFFF', fontSize: 22, fontWeight: '700' },
   projectLocation: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  projectLocationText: { color: '#BFDBFE', marginLeft: 6 },
+  projectLocationText: { color: COLORS.primaryLight, marginLeft: 6 },
   progressContainer: { marginTop: 16 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   progressLabel: { color: '#E5E7EB' },
   progressPercentage: { color: '#FFFFFF', fontWeight: '700' },
-  progressBar: { height: 8, backgroundColor: '#93C5FD', borderRadius: 9999, marginTop: 6 },
-  progressFill: { height: 8, backgroundColor: '#1D4ED8', borderRadius: 9999 },
+  progressBar: { height: 8, backgroundColor: COLORS.primaryLight, borderRadius: 9999, marginTop: 6 },
+  progressFill: { height: 8, backgroundColor: COLORS.primaryDark, borderRadius: 9999 },
   content: { flex: 1, padding: 16 },
   statsContainer: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   statCard: { flex: 1, backgroundColor: '#FFFFFF', padding: 16, marginHorizontal: 4, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
@@ -242,7 +243,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: '#6B7280', textAlign: 'center' },
   tabsContainer: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 4, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
-  activeTab: { backgroundColor: '#2563EB' },
+  activeTab: { backgroundColor: COLORS.primary },
   tabText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
   activeTabText: { color: '#FFFFFF' },
   tabContent: { flex: 1, marginBottom: 20 },
@@ -254,8 +255,8 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 12, fontWeight: '600' },
   actionButtons: { flexDirection: 'row', gap: 12, paddingBottom: 20 },
-  actionButton: { flex: 1, backgroundColor: '#2563EB', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, gap: 8 },
-  secondaryButton: { backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#2563EB' },
+  actionButton: { flex: 1, backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, gap: 8 },
+  secondaryButton: { backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: COLORS.primary },
   actionButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
-  secondaryButtonText: { color: '#2563EB' },
+  secondaryButtonText: { color: COLORS.primary },
 });

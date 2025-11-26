@@ -4,6 +4,7 @@ import { Save, Camera } from 'lucide-react-native';
 import { addCard } from '@/services/kanban';
 import { getUser } from '@/services/auth';
 import { router } from 'expo-router';
+import { COLORS } from '@/theme';
 
 export default function WorkerCreateReport() {
   const [description, setDescription] = useState('');
@@ -84,18 +85,18 @@ export default function WorkerCreateReport() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16 },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16 },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   body: { flex: 1, padding: 16 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 12 },
   label: { color: '#374151', fontWeight: '600', marginBottom: 8 },
   value: { color: '#111827' },
   textArea: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, minHeight: 120, textAlignVertical: 'top', color: '#111827' },
-  photoBtn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563EB', height: 44, borderRadius: 10 },
+  photoBtn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, height: 44, borderRadius: 10 },
   photoBtnText: { color: '#FFFFFF', fontWeight: '600' },
   hint: { marginTop: 8, color: '#6B7280' },
   footer: { padding: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E5E7EB' },
-  submitBtn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563EB', height: 48, borderRadius: 12 },
+  submitBtn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, height: 48, borderRadius: 12 },
   submitBtnDisabled: { opacity: 0.6 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '700' },
 });

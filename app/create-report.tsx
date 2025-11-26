@@ -14,6 +14,7 @@ import { listCatalog } from '@/services/materials';
 import type { ProjectDetail } from '@/types/domain';
 import type { CatalogItem } from '@/types/domain';
 import { Switch } from 'react-native';
+import { COLORS } from '@/theme';
 
 interface ImageWithTimestamp {
   uri: string;
@@ -29,7 +30,7 @@ interface SelectedMaterial {
 }
 
 const reportTypes = [
-  { key: 'progress', label: 'Avance de Instalación', color: '#2563EB' },
+  { key: 'progress', label: 'Avance de Instalación', color: COLORS.primary },
   { key: 'incident', label: 'Incidente de Seguridad', color: '#F59E0B' },
   { key: 'quality', label: 'Pruebas y Calidad', color: '#10B981' },
 ];
@@ -554,7 +555,7 @@ export default function CreateReportScreen() {
                     <Switch
                       value={sendAsIncident}
                       onValueChange={handleToggleChange}
-                      trackColor={{ false: '#E5E7EB', true: '#2563EB' }}
+                      trackColor={{ false: '#E5E7EB', true: COLORS.primary }}
                       thumbColor={sendAsIncident ? '#FFFFFF' : '#F3F4F6'}
                     />
                   </View>
@@ -628,7 +629,7 @@ export default function CreateReportScreen() {
                       {[
                         { key: 'critica', label: 'Crítica', color: '#DC2626' },
                         { key: 'alta', label: 'Alta', color: '#F59E0B' },
-                        { key: 'media', label: 'Media', color: '#3B82F6' },
+                        { key: 'media', label: 'Media', color: COLORS.primaryMuted },
                         { key: 'baja', label: 'Baja', color: '#10B981' },
                       ].map((severity) => (
                         <TouchableOpacity
@@ -704,7 +705,7 @@ export default function CreateReportScreen() {
                       onPress={openMaterialModal}
                       disabled={isLoadingCatalog || catalogMaterials.length === 0}
                     >
-                      <Plus size={20} color="#2563EB" />
+                      <Plus size={20} color={COLORS.primary} />
                       <Text style={styles.addMaterialButtonText}>
                         {isLoadingCatalog ? 'Cargando catálogo...' : 'Agregar Material'}
                       </Text>
@@ -761,7 +762,7 @@ export default function CreateReportScreen() {
               
               <View style={styles.imageButtonsContainer}>
                 <TouchableOpacity style={styles.addImageButton} onPress={showImageOptions}>
-                  <Camera size={20} color="#2563EB" />
+                  <Camera size={20} color={COLORS.primary} />
                   <Text style={styles.addImageButtonText}>Agregar Imágenes</Text>
                 </TouchableOpacity>
               </View>
@@ -940,15 +941,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  header: {
-    backgroundColor: '#2563EB',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  header: { backgroundColor: COLORS.primary, paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backButton: {
     width: 40,
     height: 40,
@@ -1044,10 +1037,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     minWidth: 120,
   },
-  pickerOptionActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
-  },
+  pickerOptionActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   pickerOptionText: {
     fontSize: 14,
     color: '#6B7280',
@@ -1126,15 +1116,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingBottom: 40,
   },
-  saveButton: {
-    backgroundColor: '#2563EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
+  saveButton: { backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, gap: 8 },
   saveButtonDisabled: {
     backgroundColor: '#9CA3AF',
   },
@@ -1146,24 +1128,8 @@ const styles = StyleSheet.create({
   imageButtonsContainer: {
     marginBottom: 16,
   },
-  addImageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    borderWidth: 2,
-    borderColor: '#2563EB',
-    borderStyle: 'dashed',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 8,
-  },
-  addImageButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
+  addImageButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primarySurface, borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed', paddingVertical: 16, paddingHorizontal: 20, borderRadius: 12, gap: 8 },
+  addImageButtonText: { fontSize: 16, fontWeight: '600', color: COLORS.primary },
   imagesContainer: {
     marginTop: 16,
   },
@@ -1200,25 +1166,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addMaterialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    borderWidth: 2,
-    borderColor: '#2563EB',
-    borderStyle: 'dashed',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-    marginBottom: 12,
-  },
-  addMaterialButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
+  addMaterialButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primarySurface, borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, gap: 8, marginBottom: 12 },
+  addMaterialButtonText: { fontSize: 16, fontWeight: '600', color: COLORS.primary },
   materialsList: {
     marginTop: 12,
     gap: 12,
@@ -1329,13 +1278,7 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
     marginTop: 4,
   },
-  modalAddButton: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
+  modalAddButton: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   modalAddButtonDisabled: {
     backgroundColor: '#9CA3AF',
   },

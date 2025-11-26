@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { listTeam } from '@/services/team';
 import type { TeamMember } from '@/types/domain';
+import { COLORS } from '@/theme';
 
 export default function WorkerTeam() {
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -28,7 +29,7 @@ export default function WorkerTeam() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16 },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16 },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   list: { padding: 16 },
   item: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },

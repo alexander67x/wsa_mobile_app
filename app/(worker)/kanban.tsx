@@ -4,6 +4,7 @@ import { KanbanSquare, Plus, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Kanban from '@/services/kanban';
 import type { KanbanBoard } from '@/types/domain';
+import { COLORS } from '@/theme';
 
 const defaultColumns = ['En revisión', 'Aprobado', 'Rechazado', 'Tareas', 'Reenviado'];
 
@@ -67,11 +68,11 @@ export default function WorkerKanban() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
   addColumnRow: { flexDirection: 'row', padding: 12, alignItems: 'center', gap: 8 },
   input: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, height: 44, color: '#111827' },
-  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563EB', paddingHorizontal: 12, height: 44, borderRadius: 10, gap: 6 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingHorizontal: 12, height: 44, borderRadius: 10, gap: 6 },
   addBtnText: { color: '#FFFFFF', fontWeight: '600' },
   board: { paddingHorizontal: 12 },
   column: { width: 280, marginRight: 12 },

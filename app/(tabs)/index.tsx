@@ -5,6 +5,7 @@ import { Search, MapPin, Calendar, ChartBar as BarChart3, Plus } from 'lucide-re
 import { getMyProjects } from '@/services/projects';
 import type { Project } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 
 interface Project {
   id: string;
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16, color: '#1F2937' },
   filterContainer: { marginBottom: 8 },
   filterButton: { paddingHorizontal: 16, paddingVertical: 8, marginRight: 12, backgroundColor: '#F3F4F6', borderRadius: 20 },
-  filterButtonActive: { backgroundColor: '#2563EB' },
+  filterButtonActive: { backgroundColor: COLORS.primary },
   filterButtonText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
   filterButtonTextActive: { color: '#FFFFFF' },
   projectsList: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },

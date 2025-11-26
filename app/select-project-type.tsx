@@ -5,6 +5,7 @@ import { ArrowLeft, FileText, AlertTriangle, CheckCircle } from 'lucide-react-na
 import { StatusBar } from 'expo-status-bar';
 import { getMyProjects } from '@/services/projects';
 import type { Project } from '@/types/domain';
+import { COLORS } from '@/theme';
 
 export default function SelectProjectTypeScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -90,7 +91,7 @@ export default function SelectProjectTypeScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2563EB" />
+            <ActivityIndicator size="large" color={COLORS.primary} />
             <Text style={styles.loadingText}>Cargando proyectos...</Text>
           </View>
         ) : (
@@ -137,7 +138,7 @@ export default function SelectProjectTypeScreen() {
                       </View>
                       {selectedProject === project.id && (
                         <View style={styles.checkmark}>
-                          <CheckCircle size={24} color="#2563EB" />
+                          <CheckCircle size={24} color={COLORS.primary} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -165,7 +166,7 @@ export default function SelectProjectTypeScreen() {
                       styles.typeIconContainer,
                       selectedType === 'report' && styles.typeIconContainerSelected
                     ]}>
-                      <FileText size={32} color={selectedType === 'report' ? '#FFFFFF' : '#2563EB'} />
+                      <FileText size={32} color={selectedType === 'report' ? '#FFFFFF' : COLORS.primary} />
                     </View>
                     <Text style={[
                       styles.typeTitle,
@@ -228,15 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  header: {
-    backgroundColor: '#2563EB',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  header: { backgroundColor: COLORS.primary, paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backButton: {
     width: 40,
     height: 40,
@@ -303,10 +296,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  projectCardSelected: {
-    borderColor: '#2563EB',
-    backgroundColor: '#EFF6FF',
-  },
+  projectCardSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySurface },
   projectInfo: {
     flex: 1,
   },
@@ -316,17 +306,13 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 4,
   },
-  projectNameSelected: {
-    color: '#2563EB',
-  },
+  projectNameSelected: { color: COLORS.primary },
   projectLocation: {
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 4,
   },
-  projectLocationSelected: {
-    color: '#3B82F6',
-  },
+  projectLocationSelected: { color: COLORS.primaryMuted },
   projectDate: {
     fontSize: 12,
     color: '#9CA3AF',
@@ -346,22 +332,9 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     alignItems: 'center',
   },
-  typeCardSelected: {
-    borderColor: '#2563EB',
-    backgroundColor: '#EFF6FF',
-  },
-  typeIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  typeIconContainerSelected: {
-    backgroundColor: '#2563EB',
-  },
+  typeCardSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySurface },
+  typeIconContainer: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.primarySurface, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  typeIconContainerSelected: { backgroundColor: COLORS.primary },
   typeTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -369,9 +342,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
-  typeTitleSelected: {
-    color: '#2563EB',
-  },
+  typeTitleSelected: { color: COLORS.primary },
   typeDescription: {
     fontSize: 14,
     color: '#6B7280',
@@ -381,13 +352,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingBottom: 40,
   },
-  continueButton: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  continueButton: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   continueButtonText: {
     fontSize: 18,
     fontWeight: '600',

@@ -4,6 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { getCard } from '@/services/kanban';
 import type { KanbanCard } from '@/types/domain';
+import { COLORS } from '@/theme';
 
 export default function WorkerReportDetail() {
   const { cardId } = useLocalSearchParams<{ cardId: string }>();
@@ -36,7 +37,7 @@ export default function WorkerReportDetail() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   content: { padding: 16 },
   title: { fontSize: 20, fontWeight: '700', color: '#111827' },

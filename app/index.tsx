@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { router } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { COLORS } from '@/theme';
 
 export default function IndexScreen() {
   useEffect(() => {
@@ -11,7 +12,7 @@ export default function IndexScreen() {
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#2563EB" />
+      <ActivityIndicator size="large" color={COLORS.primary} />
     </View>
   );
 }

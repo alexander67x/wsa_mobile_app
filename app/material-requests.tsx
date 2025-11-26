@@ -22,6 +22,7 @@ import {
 import { listMaterialRequests } from '@/services/materials';
 import type { MaterialRequest } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 
 type FilterKey = 'all' | MaterialRequest['status'];
 
@@ -77,10 +78,10 @@ export default function MaterialsScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'delivered': return '#10B981';
-      case 'approved': return '#3B82F6';
+      case 'approved': return COLORS.primaryMuted;
       case 'pending': return '#F59E0B';
       case 'rejected': return '#EF4444';
-      case 'sent': return '#2563EB';
+      case 'sent': return COLORS.primary;
       case 'draft': return '#6B7280';
       default: return '#6B7280';
     }
@@ -89,10 +90,10 @@ export default function MaterialsScreen() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'delivered': return <CheckCircle size={16} color="#10B981" />;
-      case 'approved': return <Package size={16} color="#3B82F6" />;
+      case 'approved': return <Package size={16} color={COLORS.primaryMuted} />;
       case 'pending': return <Clock size={16} color="#F59E0B" />;
       case 'rejected': return <XCircle size={16} color="#EF4444" />;
-      case 'sent': return <Truck size={16} color="#2563EB" />;
+      case 'sent': return <Truck size={16} color={COLORS.primary} />;
       case 'draft': return <CircleDot size={16} color="#6B7280" />;
       default: return <Clock size={16} color="#6B7280" />;
     }
@@ -199,7 +200,7 @@ export default function MaterialsScreen() {
 
       {isLoading && !isRefreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Cargando solicitudes...</Text>
         </View>
       ) : (
@@ -339,9 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 20,
   },
-  filterButtonActive: {
-    backgroundColor: '#2563EB',
-  },
+  filterButtonActive: { backgroundColor: COLORS.primary },
   filterButtonText: {
     fontSize: 14,
     fontWeight: '500',
@@ -475,21 +474,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
-  progressValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
+  progressValue: { fontSize: 12, fontWeight: '600', color: COLORS.primary },
   progressBar: {
     height: 6,
     backgroundColor: '#E5E7EB',
     borderRadius: 999,
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#2563EB',
-    borderRadius: 999,
-  },
+  progressFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 999 },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,

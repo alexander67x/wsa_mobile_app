@@ -13,6 +13,7 @@ import {
 import { router } from 'expo-router';
 import { Eye, EyeOff, User, Lock } from 'lucide-react-native';
 import { registerDevicePushToken } from '@/services/notifications';
+import { COLORS } from '@/theme';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -73,14 +74,14 @@ export default function LoginScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Usuario</Text>
             <View style={styles.inputWrapper}>
-              <User size={20} color="#94A3B8" style={styles.inputIcon} />
+              <User size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Ingresa tu usuario"
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor="#9CA3AF"
                 returnKeyType="next"
               />
             </View>
@@ -89,18 +90,18 @@ export default function LoginScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Contraseña</Text>
             <View style={styles.inputWrapper}>
-              <Lock size={20} color="#94A3B8" style={styles.inputIcon} />
+              <Lock size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Ingresa tu contraseña"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor="#9CA3AF"
                 returnKeyType="done"
               />
               <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
-                {showPassword ? <EyeOff size={20} color="#64748B" /> : <Eye size={20} color="#64748B" />}
+                {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
               </TouchableOpacity>
             </View>
           </View>
@@ -108,11 +109,15 @@ export default function LoginScreen() {
           <View style={styles.checkboxContainer}>
             <TouchableOpacity style={styles.checkbox} onPress={() => setRememberMe(!rememberMe)}>
               <View style={[styles.checkboxBox, rememberMe && styles.checkboxChecked]}>
-                {rememberMe && <Text style={styles.checkboxMark}>?</Text>}
+                {rememberMe && <Text style={styles.checkboxMark}>✓</Text>}
               </View>
               <Text style={styles.checkboxLabel}>Recordarme</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity onPress={() => router.push('/forgot-password')} style={styles.forgotPasswordWrapper}>
+            <Text style={styles.forgotPassword}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
@@ -130,17 +135,12 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F63E0' },
+  container: { flex: 1, backgroundColor: COLORS.primary },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 32,
   },
-  hero: {
-    paddingTop: 60,
-    paddingHorizontal: 24,
-    paddingBottom: 48,
-    backgroundColor: '#0F63E0',
-  },
+  hero: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 48, backgroundColor: COLORS.primary },
   heroShapes: {
     position: 'absolute',
     top: 0,
@@ -165,13 +165,9 @@ const styles = StyleSheet.create({
     right: -30,
     top: 10,
   },
-  heroWelcome: {
-    color: '#E0ECFF',
-    fontSize: 18,
-    marginBottom: 16,
-  },
+  heroWelcome: { color: '#FFEBD6', fontSize: 18, marginBottom: 16 },
   heroCard: {
-    backgroundColor: '#1B6DF2',
+    backgroundColor: COLORS.primaryDark,
     padding: 20,
     borderRadius: 20,
     alignItems: 'center',
@@ -179,13 +175,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   heroTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', letterSpacing: 1 },
-  heroSubtitle: { color: '#B8D0FF', fontSize: 12, marginTop: 4, letterSpacing: 3 },
-  heroDescription: {
-    color: '#E0ECFF',
-    marginTop: 20,
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  heroSubtitle: { color: '#FFD1A3', fontSize: 12, marginTop: 4, letterSpacing: 3 },
+  heroDescription: { color: '#FFEBD6', marginTop: 20, fontSize: 14, lineHeight: 20 },
   formCard: {
     marginTop: -30,
     marginHorizontal: 16,
@@ -205,10 +196,10 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFF',
+    backgroundColor: '#FFFAF5',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FFE6CC',
     paddingHorizontal: 16,
     minHeight: 56,
   },
@@ -222,32 +213,27 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#CBD5F5',
+    borderColor: COLORS.primaryBorder,
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxChecked: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  checkboxChecked: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   checkboxMark: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   checkboxLabel: { fontSize: 15, color: '#475569' },
-  loginButton: {
-    backgroundColor: '#1D4ED8',
-    borderRadius: 16,
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
+  forgotPasswordWrapper: { alignItems: 'flex-end', marginBottom: 12 },
+  forgotPassword: { color: COLORS.primary, fontWeight: '700' },
+  loginButton: { backgroundColor: COLORS.primaryDark, borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   loginButtonDisabled: { backgroundColor: '#94A3B8' },
   loginButtonText: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
   credentialsContainer: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: COLORS.primarySurface,
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E7FF',
+    borderColor: COLORS.primaryBorder,
   },
-  credentialsTitle: { fontSize: 14, fontWeight: '700', color: '#1E1B4B', marginBottom: 8 },
-  credentialsText: { fontSize: 14, color: '#312E81', marginBottom: 4, textAlign: 'center' },
+  credentialsTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
+  credentialsText: { fontSize: 14, color: COLORS.text, marginBottom: 4, textAlign: 'center' },
 });

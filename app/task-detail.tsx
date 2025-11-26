@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'rea
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Calendar, FileText, Plus, CheckCircle, Clock, Play } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { COLORS } from '@/theme';
 import { getProject } from '@/services/projects';
 import { listReports } from '@/services/reports';
 import type { ProjectDetail, Report } from '@/types/domain';
@@ -57,7 +58,7 @@ export default function TaskDetailScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return '#10B981';
-      case 'in_progress': return '#2563EB';
+      case 'in_progress': return COLORS.primary;
       case 'pending': return '#F59E0B';
       default: return '#6B7280';
     }
@@ -66,7 +67,7 @@ export default function TaskDetailScreen() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed': return <CheckCircle size={20} color="#10B981" />;
-      case 'in_progress': return <Play size={20} color="#2563EB" />;
+      case 'in_progress': return <Play size={20} color={COLORS.primary} />;
       case 'pending': return <Clock size={20} color="#F59E0B" />;
       default: return <Clock size={20} color="#6B7280" />;
     }
@@ -130,7 +131,7 @@ export default function TaskDetailScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <FileText size={20} color="#2563EB" />
+            <FileText size={20} color={COLORS.primary} />
             <Text style={styles.sectionTitle}>Reportes de Avance</Text>
             <Text style={styles.reportCount}>({reports.length})</Text>
           </View>
@@ -185,7 +186,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: '#6B7280' },
-  header: { backgroundColor: '#2563EB', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
   reportDate: { fontSize: 12, color: '#9CA3AF', marginBottom: 4 },
   reportAuthor: { fontSize: 14, color: '#6B7280' },
   footer: { padding: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E5E7EB' },
-  createReportButton: { backgroundColor: '#2563EB', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, gap: 8 },
+  createReportButton: { backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, gap: 8 },
   createReportButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
 });
 
