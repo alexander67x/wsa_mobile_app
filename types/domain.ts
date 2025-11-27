@@ -65,6 +65,8 @@ export interface ReportDetail {
   images: string[];
   approvedBy?: string;
   approvedDate?: string;
+  rejectedBy?: string;
+  rejectedDate?: string;
   feedback?: string;
 }
 

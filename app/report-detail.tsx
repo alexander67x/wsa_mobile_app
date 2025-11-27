@@ -56,6 +56,19 @@ export default function ReportDetailScreen() {
     }
   };
 
+  const isApproved = data.status === 'approved';
+  const isRejected = data.status === 'rejected';
+  const reviewer = isApproved ? data.approvedBy : data.rejectedBy;
+  const reviewDate = isApproved ? data.approvedDate : data.rejectedDate;
+  const reviewTitle = isApproved ? 'Aprobacion' : 'Rechazo';
+  const reviewIcon = isApproved ? <CheckCircle size={20} color="#166534" /> : <AlertTriangle size={20} color="#991B1B" />;
+  const reviewLabelColor = isApproved ? '#166534' : '#991B1B';
+  const reviewCardStyle = isApproved ? styles.approvalCard : styles.rejectionCard;
+  const reviewBorderColor = isApproved ? '#10B981' : '#EF4444';
+  const observationsText = data.observations || 'Sin observaciones registradas';
+  const feedbackText = data.feedback || 'Sin comentarios';
+  const hasImages = (data.images?.length ?? 0) > 0;
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -98,7 +111,7 @@ export default function ReportDetailScreen() {
             </View>
             <View style={styles.metaItem}>
               <MapPin size={16} color="#6B7280" />
-              <Text style={styles.metaText}>{data.location}</Text>
+              <Text style={styles.metaText}>{data.location || 'Sin ubicacion registrada'}</Text>
             </View>
           </View>
 
@@ -122,7 +135,7 @@ export default function ReportDetailScreen() {
 
         <View style={styles.observationsCard}>
           <Text style={styles.cardTitle}>Observaciones</Text>
-          <Text style={styles.observationsText}>{data.observations}</Text>
+          <Text style={styles.observationsText}>{observationsText}</Text>
         </View>
 
         <View style={styles.imagesCard}>
@@ -130,33 +143,41 @@ export default function ReportDetailScreen() {
             <Camera size={20} color="#6B7280" />
             <Text style={[styles.cardTitle, { marginLeft: 8 }]}>Evidencias</Text>
           </View>
-          <View style={styles.imagesContainer}>
-            {data.images.map((uri, idx) => (
-              <View key={idx} style={styles.imageWrapper}>
-                <Image source={{ uri }} style={styles.evidenceImage} />
-              </View>
-            ))}
-          </View>
+          {hasImages ? (
+            <View style={styles.imagesContainer}>
+              {data.images.map((uri, idx) => (
+                <View key={idx} style={styles.imageWrapper}>
+                  <Image source={{ uri }} style={styles.evidenceImage} />
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.noImagesText}>Sin evidencias adjuntas</Text>
+          )}
         </View>
 
-        <View style={styles.approvalCard}>
-          <View style={styles.approvalHeader}>
-            <CheckCircle size={20} color="#166534" />
-            <Text style={[styles.cardTitle, { marginLeft: 8 }]}>Aprobación</Text>
+        {(isApproved || isRejected) && (
+          <View style={[styles.reviewCard, reviewCardStyle, { borderLeftColor: reviewBorderColor }]}>
+            <View style={styles.approvalHeader}>
+              {reviewIcon}
+              <Text style={[styles.cardTitle, { marginLeft: 8, color: reviewLabelColor }]}>{reviewTitle}</Text>
+            </View>
+            <View style={styles.approvalInfo}>
+              <Text style={[styles.approvalLabel, { color: reviewLabelColor }]}>
+                {isApproved ? 'Aprobado por' : 'Rechazado por'}
+              </Text>
+              <Text style={[styles.approvalValue, { color: reviewLabelColor }]}>{reviewer || 'No registrado'}</Text>
+            </View>
+            <View style={styles.approvalInfo}>
+              <Text style={[styles.approvalLabel, { color: reviewLabelColor }]}>Fecha</Text>
+              <Text style={[styles.approvalValue, { color: reviewLabelColor }]}>{reviewDate || 'No registrada'}</Text>
+            </View>
+            <View style={[styles.feedbackContainer, { borderTopColor: isApproved ? 'rgba(22, 101, 52, 0.2)' : 'rgba(185, 28, 28, 0.2)' }]}>
+              <Text style={[styles.feedbackLabel, { color: reviewLabelColor }]}>Comentarios</Text>
+              <Text style={[styles.feedbackText, { color: reviewLabelColor }]}>{feedbackText}</Text>
+            </View>
           </View>
-          <View style={styles.approvalInfo}>
-            <Text style={styles.approvalLabel}>Aprobado por</Text>
-            <Text style={styles.approvalValue}>{data.approvedBy}</Text>
-          </View>
-          <View style={styles.approvalInfo}>
-            <Text style={styles.approvalLabel}>Fecha</Text>
-            <Text style={styles.approvalValue}>{data.approvedDate}</Text>
-          </View>
-          <View style={styles.feedbackContainer}>
-            <Text style={styles.feedbackLabel}>Comentarios</Text>
-            <Text style={styles.feedbackText}>{data.feedback}</Text>
-          </View>
-        </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -193,15 +214,18 @@ const styles = StyleSheet.create({
   observationsText: { fontSize: 16, color: '#92400E', lineHeight: 24 },
   imagesCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   imagesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  imagesContainer: { flexDirection: 'row' },
-  imageWrapper: { marginRight: 12 },
+  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  imageWrapper: { marginRight: 12, marginBottom: 12 },
   evidenceImage: { width: 120, height: 120, borderRadius: 8, backgroundColor: '#F3F4F6' },
-  approvalCard: { backgroundColor: '#DCFCE7', borderRadius: 16, padding: 20, marginBottom: 32, borderLeftWidth: 4, borderLeftColor: '#10B981' },
+  noImagesText: { color: '#6B7280', fontSize: 14 },
+  reviewCard: { borderRadius: 16, padding: 20, marginBottom: 32, borderLeftWidth: 4 },
+  approvalCard: { backgroundColor: '#DCFCE7' },
+  rejectionCard: { backgroundColor: '#FEE2E2' },
   approvalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   approvalInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   approvalLabel: { fontSize: 14, color: '#166534', fontWeight: '500' },
   approvalValue: { fontSize: 14, color: '#166534', fontWeight: '600' },
-  feedbackContainer: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(22, 101, 52, 0.2)' },
+  feedbackContainer: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
   feedbackLabel: { fontSize: 14, color: '#166534', fontWeight: '500', marginBottom: 8 },
   feedbackText: { fontSize: 16, color: '#166534', lineHeight: 22 },
 });
