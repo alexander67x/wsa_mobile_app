@@ -40,6 +40,10 @@ interface ApiReportDetail {
   images: string[];
   approvedBy: string | null;
   approvedDate: string | null;
+  rejectedBy?: string | null;
+  rejectedDate?: string | null;
+  rejectionComments?: string | null;
+  approvalComments?: string | null;
   feedback: string | null;
   difficulties: string | null;
   materialsUsed: string | null;
@@ -116,7 +120,9 @@ export async function getReport(id: string): Promise<ReportDetail & { taskId?: s
     images: apiReport.images || [],
     approvedBy: apiReport.approvedBy || undefined,
     approvedDate: apiReport.approvedDate || undefined,
-    feedback: apiReport.feedback || undefined,
+    rejectedBy: apiReport.rejectedBy || undefined,
+    rejectedDate: apiReport.rejectedDate || undefined,
+    feedback: apiReport.feedback || apiReport.rejectionComments || apiReport.approvalComments || undefined,
     taskId: apiReport.taskId || undefined,
     taskTitle: apiReport.taskTitle || undefined,
     taskDescription: apiReport.taskDescription || undefined,

@@ -53,6 +53,7 @@ export default function RootLayout() {
         <Stack.Screen name="kanban" />
         <Stack.Screen name="request-material" />
         <Stack.Screen name="material-request-detail" />
+        <Stack.Screen name="work-session-detail" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
