@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Image,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -19,14 +18,13 @@ import {
     CheckCircle2,
     Clock,
     Package,
-    Trash2,
     Truck,
     XCircle,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
-import { deliverMaterialRequest, getMaterialRequest, type DeliverMaterialRequestInput } from '@/services/materials';
+import { deliverMaterialRequest, getMaterialRequest } from '@/services/materials';
 import type { MaterialRequestDetail } from '@/types/domain';
 import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { COLORS } from '@/theme';
@@ -72,8 +70,6 @@ export default function MaterialRequestDetailScreen() {
     const [globalDeliveryNotes, setGlobalDeliveryNotes] = useState('');
     const [deliveryImages, setDeliveryImages] = useState<DeliveryImage[]>([]);
     const [isUploadingImages, setIsUploadingImages] = useState(false);
-    const [evidenceImages, setEvidenceImages] = useState<Record<string, string[]>>({});
-    const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
 
     const statusColor = STATUS_COLORS[detail?.status ?? 'pending'] ?? '#6B7280';
 
@@ -102,13 +98,6 @@ export default function MaterialRequestDetailScreen() {
             const next: Record<string, DeliveryInput> = {};
             for (const item of detail.items) {
                 next[item.id] = current[item.id] ?? { quantity: '', lotNumber: '', observations: '' };
-            }
-            return next;
-        });
-        setEvidenceImages(current => {
-            const next: Record<string, string[]> = {};
-            for (const item of detail.items) {
-                next[item.id] = current[item.id] ?? [];
             }
             return next;
         });
@@ -168,21 +157,6 @@ export default function MaterialRequestDetailScreen() {
         }
     };
 
-    const confirmRemoveImage = (index: number) => {
-        Alert.alert(
-            'Eliminar evidencia',
-            '¿Deseas eliminar esta imagen?',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Eliminar',
-                    style: 'destructive',
-                    onPress: () => setDeliveryImages(images => images.filter((_, i) => i !== index)),
-                },
-            ],
-        );
-    };
-
     const showImageOptions = () => {
         Alert.alert(
             'Agregar evidencia',
@@ -191,6 +165,18 @@ export default function MaterialRequestDetailScreen() {
                 { text: 'Tomar foto', onPress: takeDeliveryPhoto },
                 { text: 'Abrir galería', onPress: pickDeliveryImages },
                 { text: 'Cancelar', style: 'cancel' },
+            ],
+        );
+    };
+
+    const confirmClearImages = () => {
+        if (deliveryImages.length === 0) return;
+        Alert.alert(
+            'Limpiar evidencias',
+            '¿Deseas eliminar todas las imágenes seleccionadas?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Eliminar', style: 'destructive', onPress: () => setDeliveryImages([]) },
             ],
         );
     };
@@ -210,92 +196,6 @@ export default function MaterialRequestDetailScreen() {
     }, []);
 
     const deliverableItems = useMemo(() => detail?.items ?? [], [detail?.items]);
-
-    const addEvidenceUris = useCallback((itemId: string, uris: string[]) => {
-        if (!itemId || !uris.length) return;
-        setEvidenceImages(state => ({
-            ...state,
-            [itemId]: [...(state[itemId] ?? []), ...uris],
-        }));
-    }, []);
-
-    const selectEvidenceFromLibrary = useCallback(async (itemId: string) => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permiso requerido', 'Activa el permiso de fotos para adjuntar evidencia.');
-            return;
-        }
-
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsMultipleSelection: true,
-            quality: 0.7,
-        });
-
-        if (!result.canceled && result.assets?.length) {
-            addEvidenceUris(itemId, result.assets.map(asset => asset.uri));
-        }
-    }, [addEvidenceUris]);
-
-    const takeEvidencePhoto = useCallback(async (itemId: string) => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permiso requerido', 'Activa el permiso de camara para adjuntar evidencia.');
-            return;
-        }
-
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.7,
-            allowsEditing: true,
-        });
-
-        if (!result.canceled && result.assets?.length) {
-            addEvidenceUris(itemId, result.assets.map(asset => asset.uri));
-        }
-    }, [addEvidenceUris]);
-
-    const handleEvidenceOptions = useCallback((itemId: string) => {
-        Alert.alert('Agregar evidencia', 'Elige como agregar la foto de recepcion.', [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Tomar foto', onPress: () => takeEvidencePhoto(itemId) },
-            { text: 'Elegir de galeria', onPress: () => selectEvidenceFromLibrary(itemId) },
-        ]);
-    }, [selectEvidenceFromLibrary, takeEvidencePhoto]);
-
-    const removeEvidenceImage = useCallback((itemId: string, index: number) => {
-        setEvidenceImages(state => {
-            const current = state[itemId] ?? [];
-            const nextImages = current.filter((_, idx) => idx !== index);
-            return { ...state, [itemId]: nextImages };
-        });
-    }, []);
-
-    const appendEvidenceToDeliveries = useCallback(async (
-        deliveries: DeliverMaterialRequestInput['deliveries']
-    ) => {
-        const deliveriesWithEvidence: DeliverMaterialRequestInput['deliveries'] = [];
-
-        for (const delivery of deliveries) {
-            const itemId = delivery.itemId ?? '';
-            const images = itemId ? evidenceImages[itemId] ?? [] : [];
-
-            if (!images.length) {
-                deliveriesWithEvidence.push(delivery);
-                continue;
-            }
-
-            const uploaded = await uploadImagesToCloudinary(images, 'material-receipts');
-            const evidenceNote = `Evidencia: ${uploaded.join(', ')}`;
-
-            deliveriesWithEvidence.push({
-                ...delivery,
-                observations: [delivery.observations?.trim(), evidenceNote].filter(Boolean).join(' | '),
-            });
-        }
-
-        return deliveriesWithEvidence;
-    }, [evidenceImages, uploadImagesToCloudinary]);
 
     const handleDeliveries = useCallback(async () => {
         if (!detail || !requestId) return;
@@ -373,18 +273,9 @@ export default function MaterialRequestDetailScreen() {
         }
 
         setActionState('deliver');
-        const hasEvidence = deliveries.some(d => (d.itemId ? evidenceImages[d.itemId]?.length : 0) ?? 0);
         try {
-            if (hasEvidence) {
-                setIsUploadingEvidence(true);
-            }
-
-            const deliveriesWithEvidence = hasEvidence
-                ? await appendEvidenceToDeliveries(deliveries)
-                : deliveries;
-
             const updated = await deliverMaterialRequest(requestId, {
-                deliveries: deliveriesWithEvidence,
+                deliveries,
                 observations: globalDeliveryNotes.trim() || undefined,
                 images: uploadedImages,
             });
@@ -397,28 +288,16 @@ export default function MaterialRequestDetailScreen() {
                 }
                 return next;
             });
-            // Clear global delivery images and per-item evidence that was uploaded
+            // Clear global delivery images after successful upload
             setDeliveryImages([]);
-            if (hasEvidence) {
-                setEvidenceImages(state => {
-                    const next = { ...state };
-                    for (const delivery of deliveries) {
-                        if (delivery.itemId) {
-                            next[delivery.itemId] = [];
-                        }
-                    }
-                    return next;
-                });
-            }
             Alert.alert('Entregas registradas', 'Se registraron las entregas correctamente.');
         } catch (error) {
             console.error(error);
             Alert.alert('Error', 'No se pudieron registrar las entregas o subir las evidencias.');
         } finally {
             setActionState(null);
-            setIsUploadingEvidence(false);
         }
-    }, [deliverableItems, deliveryInputs, globalDeliveryNotes, detail, requestId, deliveryImages, evidenceImages, appendEvidenceToDeliveries]);
+    }, [deliverableItems, deliveryInputs, globalDeliveryNotes, detail, requestId, deliveryImages]);
 
     if (!requestId) {
         return (
@@ -508,7 +387,6 @@ export default function MaterialRequestDetailScreen() {
                         <Text style={styles.sectionTitle}>Materiales solicitados</Text>
                         {detail.items.map(item => {
                             const input = deliveryInputs[item.id] ?? { quantity: '', lotNumber: '', observations: '' };
-                            const evidence = evidenceImages[item.id] ?? [];
                             const approved = item.approvedQty ?? item.requestedQty;
                             const delivered = item.deliveredQty ?? 0;
                             const pending = Math.max(approved - delivered, 0);
@@ -593,42 +471,6 @@ export default function MaterialRequestDetailScreen() {
                                                 placeholder="Notas sobre la entrega"
                                                 placeholderTextColor="#9CA3AF"
                                             />
-                                            <View style={styles.evidenceContainer}>
-                                                <View style={styles.evidenceHeader}>
-                                                    <Text style={styles.deliveryFormLabel}>Evidencia de recepcion</Text>
-                                                    {evidence.length ? (
-                                                        <Text style={styles.evidenceCount}>
-                                                            {evidence.length} foto{evidence.length === 1 ? '' : 's'}
-                                                        </Text>
-                                                    ) : null}
-                                                </View>
-                                                <TouchableOpacity
-                                                    style={styles.evidenceButton}
-                                                    onPress={() => handleEvidenceOptions(item.id)}
-                                                >
-                                                    <Camera size={16} color={COLORS.primary} />
-                                                    <Text style={styles.evidenceButtonText}>Agregar foto</Text>
-                                                </TouchableOpacity>
-                                                {evidence.length ? (
-                                                    <View style={styles.evidencePreviewRow}>
-                                                        {evidence.map((uri, idx) => (
-                                                            <View key={`${uri}-${idx}`} style={styles.evidenceImageWrapper}>
-                                                                <Image source={{ uri }} style={styles.evidenceImage} />
-                                                                <TouchableOpacity
-                                                                    style={styles.evidenceRemove}
-                                                                    onPress={() => removeEvidenceImage(item.id, idx)}
-                                                                >
-                                                                    <XCircle size={16} color="#FFFFFF" />
-                                                                </TouchableOpacity>
-                                                            </View>
-                                                        ))}
-                                                    </View>
-                                                ) : (
-                                                    <Text style={styles.evidenceHint}>
-                                                        Adjunta una foto de la recepcion del material (opcional).
-                                                    </Text>
-                                                )}
-                                            </View>
                                         </View>
                                     ) : null}
                                 </View>
@@ -719,34 +561,27 @@ export default function MaterialRequestDetailScreen() {
                                     Completa la cantidad entregada por material y, si aplica, el número de lote.
                                 </Text>
 
-                                <Text style={styles.inputLabel}>Evidencias fotográficas</Text>
+                                <Text style={styles.inputLabel}>Evidencias fotográficas (opcional)</Text>
                                 <View style={styles.evidenceButtonsRow}>
                                     <TouchableOpacity style={styles.addImageButton} onPress={showImageOptions}>
                                         <Camera size={18} color={COLORS.primary} />
-                                        <Text style={styles.addImageButtonText}>Agregar imágenes</Text>
+                                        <Text style={styles.addImageButtonText}>
+                                            {deliveryImages.length > 0 ? 'Agregar más evidencias' : 'Adjuntar evidencias'}
+                                        </Text>
                                     </TouchableOpacity>
+                                    {deliveryImages.length > 0 && (
+                                        <TouchableOpacity style={styles.clearImagesButton} onPress={confirmClearImages}>
+                                            <Text style={styles.clearImagesText}>Limpiar</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
 
                                 {deliveryImages.length > 0 && (
-                                    <View style={styles.imagesPreviewContainer}>
-                                        <Text style={styles.imagesCountText}>
-                                            {deliveryImages.length}{' '}
-                                            {deliveryImages.length === 1 ? 'imagen seleccionada' : 'imágenes seleccionadas'}
-                                        </Text>
-                                        <View style={styles.imagesGrid}>
-                                            {deliveryImages.map((image, index) => (
-                                                <View key={`${image.uri}-${index}`} style={styles.imageWrapper}>
-                                                    <Image source={{ uri: image.uri }} style={styles.imagePreview} />
-                                                    <TouchableOpacity
-                                                        style={styles.removeImageButton}
-                                                        onPress={() => confirmRemoveImage(index)}
-                                                    >
-                                                        <Trash2 size={14} color="#fff" />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    </View>
+                                    <Text style={styles.imagesCountText}>
+                                        {deliveryImages.length === 1
+                                            ? '1 evidencia lista para enviar'
+                                            : `${deliveryImages.length} evidencias listas para enviar`}
+                                    </Text>
                                 )}
 
                                 {isUploadingImages && (
@@ -776,7 +611,7 @@ export default function MaterialRequestDetailScreen() {
                                         {isUploadingImages
                                             ? 'Subiendo evidencias...'
                                             : actionState === 'deliver'
-                                                ? (isUploadingEvidence ? 'Subiendo evidencia...' : 'Guardando...')
+                                                ? 'Guardando...'
                                                 : 'Registrar entregas'}
                                     </Text>
                                 </TouchableOpacity>
@@ -982,75 +817,6 @@ const styles = StyleSheet.create({
         minHeight: 80,
         textAlignVertical: 'top',
     },
-    evidenceContainer: {
-        marginTop: 12,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        borderRadius: 12,
-        padding: 12,
-        backgroundColor: '#F9FAFB',
-    },
-    evidenceHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    evidenceCount: {
-        fontSize: 12,
-        color: '#6B7280',
-    },
-    evidenceButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: COLORS.primary,
-        borderRadius: 10,
-        backgroundColor: COLORS.primarySurface,
-        gap: 8,
-    },
-    evidenceButtonText: {
-        color: COLORS.primary,
-        fontWeight: '600',
-    },
-    evidencePreviewRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-        marginTop: 12,
-    },
-    evidenceImageWrapper: {
-        position: 'relative',
-        width: 72,
-        height: 72,
-        borderRadius: 10,
-        overflow: 'hidden',
-        backgroundColor: '#E5E7EB',
-    },
-    evidenceImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    evidenceRemove: {
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        backgroundColor: 'rgba(239, 68, 68, 0.9)',
-        borderRadius: 14,
-        width: 28,
-        height: 28,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    evidenceHint: {
-        marginTop: 8,
-        fontSize: 12,
-        color: '#6B7280',
-    },
     deliveryRecord: {
         borderWidth: 1,
         borderColor: '#E5E7EB',
@@ -1114,6 +880,8 @@ const styles = StyleSheet.create({
     },
     evidenceButtonsRow: {
         flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
         marginTop: 12,
         marginBottom: 8,
     },
@@ -1126,45 +894,31 @@ const styles = StyleSheet.create({
         borderColor: COLORS.primary,
         borderRadius: 12,
         paddingVertical: 10,
+        paddingHorizontal: 14,
         gap: 8,
         backgroundColor: COLORS.primarySurface,
+        flex: 1,
     },
     addImageButtonText: {
         color: COLORS.primary,
         fontWeight: '600',
     },
-    imagesPreviewContainer: {
-        marginBottom: 8,
+    clearImagesButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        backgroundColor: '#FEF2F2',
+    },
+    clearImagesText: {
+        color: '#DC2626',
+        fontWeight: '600',
     },
     imagesCountText: {
         fontSize: 12,
         color: '#4B5563',
         marginBottom: 8,
-    },
-    imagesGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    imageWrapper: {
-        width: 96,
-        height: 96,
-        borderRadius: 12,
-        overflow: 'hidden',
-        position: 'relative',
-        backgroundColor: '#E5E7EB',
-    },
-    imagePreview: {
-        width: '100%',
-        height: '100%',
-    },
-    removeImageButton: {
-        position: 'absolute',
-        top: 6,
-        right: 6,
-        backgroundColor: 'rgba(17, 24, 39, 0.7)',
-        borderRadius: 12,
-        padding: 4,
     },
     uploadingText: {
         fontSize: 12,
