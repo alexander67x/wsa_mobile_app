@@ -30,14 +30,17 @@ interface ApiMaterialRequest {
   id: MaybeNumber;
   code?: MaybeString;
   codigo?: MaybeString;
+  numeroSolicitud?: MaybeString;
   projectId?: MaybeNumber;
   proyectoId?: MaybeNumber;
   projectName?: MaybeString;
   proyecto?: { id?: MaybeNumber; nombre?: MaybeString } | MaybeString;
+  solicitadoPor?: { id?: MaybeNumber; nombre?: MaybeString } | MaybeString;
   requesterName?: MaybeString;
   solicitante?: MaybeString;
   requestDate?: MaybeString;
   fechaSolicitud?: MaybeString;
+  fechaRequerida?: MaybeString;
   request_date?: MaybeString;
   status?: MaybeString;
   estado?: MaybeString;
@@ -46,14 +49,18 @@ interface ApiMaterialRequest {
   estado_label?: MaybeString;
   priority?: MaybeString;
   prioridad?: MaybeString;
+  motivo?: MaybeString;
+  urgente?: boolean;
   observations?: MaybeString;
   observaciones?: MaybeString;
   deliveryProgress?: number | null;
   avanceEntrega?: number | null;
   delivery_percentage?: number | null;
+  porcentajeEntregado?: number | null;
   totalItems?: number | null;
   total_items?: number | null;
   items_count?: number | null;
+  itemsCount?: number | null;
   totalApprovedQuantity?: number | null;
   cantidadAprobadaTotal?: number | null;
   totalDeliveredQuantity?: number | null;
@@ -250,7 +257,10 @@ const mapMaterialRequest = (request: ApiMaterialRequest): MaterialRequest => {
   const quantity = request.quantity ?? request.cantidad ?? firstItem?.approvedQty ?? firstItem?.requestedQty;
 
   const deliveryProgressExplicit =
-    request.deliveryProgress ?? request.avanceEntrega ?? request.delivery_percentage;
+    request.deliveryProgress ??
+    request.avanceEntrega ??
+    request.delivery_percentage ??
+    request.porcentajeEntregado;
   const deliveryProgress =
     typeof deliveryProgressExplicit === 'number'
       ? deliveryProgressExplicit
@@ -269,17 +279,26 @@ const mapMaterialRequest = (request: ApiMaterialRequest): MaterialRequest => {
 
   const requestId = request.id != null ? normalizeId(request.id) : '';
 
+  const requester =
+    request.solicitadoPor && typeof request.solicitadoPor === 'object'
+      ? request.solicitadoPor
+      : undefined;
+
   return {
     id: requestId,
     code:
       normalizeString(request.code) ??
       normalizeString(request.codigo) ??
+      normalizeString(request.numeroSolicitud) ??
       undefined,
     projectId: normalizeOptionalId(request.projectId ?? request.proyectoId ?? project?.id),
     projectName: projectName ?? 'Sin proyecto',
     requesterName:
       normalizeString(request.requesterName) ??
-      normalizeString(request.solicitante),
+      normalizeString(request.solicitante) ??
+      (typeof request.solicitadoPor === 'string'
+        ? normalizeString(request.solicitadoPor)
+        : normalizeString(requester?.nombre)),
     requestDate:
       normalizeString(request.requestDate) ??
       normalizeString(request.fechaSolicitud) ??
@@ -299,6 +318,7 @@ const mapMaterialRequest = (request: ApiMaterialRequest): MaterialRequest => {
       request.totalItems ??
       request.total_items ??
       request.items_count ??
+      request.itemsCount ??
       (items.length ? items.length : undefined),
     totalApprovedQuantity: totalApproved || undefined,
     totalDeliveredQuantity: totalDelivered || undefined,
@@ -438,6 +458,12 @@ export interface DeliverMaterialRequestInput {
     observations?: string;
   }>;
   observations?: string;
+  images?: Array<{
+    url: string;
+    latitude?: number;
+    longitude?: number;
+    takenAt?: string;
+  }>;
 }
 
 export async function deliverMaterialRequest(

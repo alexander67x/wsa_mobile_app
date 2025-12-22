@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -13,16 +14,21 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     ArrowLeft,
+    Camera,
     Calendar,
     CheckCircle2,
     Clock,
     Package,
+    Trash2,
     Truck,
     XCircle,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 
 import { deliverMaterialRequest, getMaterialRequest } from '@/services/materials';
 import type { MaterialRequestDetail } from '@/types/domain';
+import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { COLORS } from '@/theme';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -48,6 +54,11 @@ type DeliveryInput = {
 
 type ActionState = 'deliver' | null;
 
+interface DeliveryImage {
+    uri: string;
+    takenAt: string;
+}
+
 export default function MaterialRequestDetailScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{ id?: string }>();
@@ -59,6 +70,8 @@ export default function MaterialRequestDetailScreen() {
     const [actionState, setActionState] = useState<ActionState>(null);
     const [deliveryInputs, setDeliveryInputs] = useState<Record<string, DeliveryInput>>({});
     const [globalDeliveryNotes, setGlobalDeliveryNotes] = useState('');
+    const [deliveryImages, setDeliveryImages] = useState<DeliveryImage[]>([]);
+    const [isUploadingImages, setIsUploadingImages] = useState(false);
 
     const statusColor = STATUS_COLORS[detail?.status ?? 'pending'] ?? '#6B7280';
 
@@ -97,6 +110,82 @@ export default function MaterialRequestDetailScreen() {
         loadDetail();
     }, [loadDetail]);
 
+    const appendImages = (assets: ImagePicker.ImagePickerAsset[]) => {
+        const now = new Date().toISOString();
+        const mapped = assets.map(asset => {
+            let takenAt = now;
+            if (asset?.exif?.DateTimeOriginal) {
+                takenAt = new Date(asset.exif.DateTimeOriginal).toISOString();
+            } else if (asset?.exif?.DateTime) {
+                takenAt = new Date(asset.exif.DateTime).toISOString();
+            }
+            return {
+                uri: asset.uri,
+                takenAt,
+            };
+        });
+        setDeliveryImages(prev => [...prev, ...mapped]);
+    };
+
+    const pickDeliveryImages = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                quality: 0.8,
+            });
+            if (!result.canceled && result.assets) {
+                appendImages(result.assets);
+            }
+        } catch (error) {
+            console.error('Error selecting images:', error);
+            Alert.alert('Error', 'No se pudieron seleccionar las imágenes.');
+        }
+    };
+
+    const takeDeliveryPhoto = async () => {
+        try {
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.8,
+                allowsEditing: true,
+            });
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                appendImages([result.assets[0]]);
+            }
+        } catch (error) {
+            console.error('Error taking photo:', error);
+            Alert.alert('Error', 'No se pudo tomar la foto.');
+        }
+    };
+
+    const confirmRemoveImage = (index: number) => {
+        Alert.alert(
+            'Eliminar evidencia',
+            '¿Deseas eliminar esta imagen?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: () => setDeliveryImages(images => images.filter((_, i) => i !== index)),
+                },
+            ],
+        );
+    };
+
+    const showImageOptions = () => {
+        Alert.alert(
+            'Agregar evidencia',
+            'Selecciona una opción para agregar imágenes',
+            [
+                { text: 'Tomar foto', onPress: takeDeliveryPhoto },
+                { text: 'Abrir galería', onPress: pickDeliveryImages },
+                { text: 'Cancelar', style: 'cancel' },
+            ],
+        );
+    };
+
     const handleApprove = useCallback(() => {
         Alert.alert(
             'Acción no disponible',
@@ -130,11 +219,70 @@ export default function MaterialRequestDetailScreen() {
             return;
         }
 
+        let uploadedImages:
+            | Array<{ url: string; latitude?: number; longitude?: number; takenAt?: string }>
+            | undefined;
+
+        if (deliveryImages.length > 0) {
+            let deviceLocation: { latitude: number; longitude: number } | null = null;
+            try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    const location = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced,
+                    });
+                    deviceLocation = {
+                        latitude: location.coords.latitude,
+                        longitude: location.coords.longitude,
+                    };
+                }
+            } catch (error) {
+                console.warn('Error getting location for delivery evidence:', error);
+            }
+
+            if (!deviceLocation) {
+                Alert.alert(
+                    'Ubicación requerida',
+                    'Se necesita la ubicación del dispositivo para asociar las evidencias de entrega.',
+                    [
+                        { text: 'Cancelar', style: 'cancel' },
+                        {
+                            text: 'Continuar sin imágenes',
+                            onPress: () => setDeliveryImages([]),
+                        },
+                    ],
+                );
+                return;
+            }
+
+            setIsUploadingImages(true);
+            try {
+                const imageUris = deliveryImages.map(image => image.uri);
+                const urls = await uploadImagesToCloudinary(imageUris, 'material-deliveries');
+                uploadedImages = urls.map((url, index) => ({
+                    url,
+                    latitude: deviceLocation!.latitude,
+                    longitude: deviceLocation!.longitude,
+                    takenAt: deliveryImages[index].takenAt,
+                }));
+            } catch (error) {
+                console.error('Error uploading delivery images:', error);
+                Alert.alert(
+                    'Error al subir imágenes',
+                    'No se pudieron subir las evidencias fotográficas. Intenta nuevamente.',
+                );
+                return;
+            } finally {
+                setIsUploadingImages(false);
+            }
+        }
+
         setActionState('deliver');
         try {
             const updated = await deliverMaterialRequest(requestId, {
                 deliveries,
                 observations: globalDeliveryNotes.trim() || undefined,
+                images: uploadedImages,
             });
             setDetail(updated);
             setGlobalDeliveryNotes('');
@@ -145,6 +293,7 @@ export default function MaterialRequestDetailScreen() {
                 }
                 return next;
             });
+            setDeliveryImages([]);
             Alert.alert('Entregas registradas', 'Se registraron las entregas correctamente.');
         } catch (error) {
             console.error(error);
@@ -152,7 +301,7 @@ export default function MaterialRequestDetailScreen() {
         } finally {
             setActionState(null);
         }
-    }, [deliverableItems, deliveryInputs, globalDeliveryNotes, detail, requestId]);
+    }, [deliverableItems, deliveryInputs, globalDeliveryNotes, detail, requestId, deliveryImages]);
 
     if (!requestId) {
         return (
@@ -416,6 +565,40 @@ export default function MaterialRequestDetailScreen() {
                                     Completa la cantidad entregada por material y, si aplica, el número de lote.
                                 </Text>
 
+                                <Text style={styles.inputLabel}>Evidencias fotográficas</Text>
+                                <View style={styles.evidenceButtonsRow}>
+                                    <TouchableOpacity style={styles.addImageButton} onPress={showImageOptions}>
+                                        <Camera size={18} color={COLORS.primary} />
+                                        <Text style={styles.addImageButtonText}>Agregar imágenes</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {deliveryImages.length > 0 && (
+                                    <View style={styles.imagesPreviewContainer}>
+                                        <Text style={styles.imagesCountText}>
+                                            {deliveryImages.length}{' '}
+                                            {deliveryImages.length === 1 ? 'imagen seleccionada' : 'imágenes seleccionadas'}
+                                        </Text>
+                                        <View style={styles.imagesGrid}>
+                                            {deliveryImages.map((image, index) => (
+                                                <View key={`${image.uri}-${index}`} style={styles.imageWrapper}>
+                                                    <Image source={{ uri: image.uri }} style={styles.imagePreview} />
+                                                    <TouchableOpacity
+                                                        style={styles.removeImageButton}
+                                                        onPress={() => confirmRemoveImage(index)}
+                                                    >
+                                                        <Trash2 size={14} color="#fff" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                )}
+
+                                {isUploadingImages && (
+                                    <Text style={styles.uploadingText}>Subiendo evidencias...</Text>
+                                )}
+
                                 <Text style={styles.inputLabel}>Observaciones generales (opcional)</Text>
                                 <TextInput
                                     style={[styles.input, styles.textArea]}
@@ -428,12 +611,19 @@ export default function MaterialRequestDetailScreen() {
                                 />
 
                                 <TouchableOpacity
-                                    style={[styles.primaryButton, actionState === 'deliver' && styles.disabledButton]}
+                                    style={[
+                                        styles.primaryButton,
+                                        (actionState === 'deliver' || isUploadingImages) && styles.disabledButton,
+                                    ]}
                                     onPress={handleDeliveries}
-                                    disabled={actionState === 'deliver'}
+                                    disabled={actionState === 'deliver' || isUploadingImages}
                                 >
                                     <Text style={styles.primaryButtonText}>
-                                        {actionState === 'deliver' ? 'Guardando...' : 'Registrar entregas'}
+                                        {isUploadingImages
+                                            ? 'Subiendo evidencias...'
+                                            : actionState === 'deliver'
+                                                ? 'Guardando...'
+                                                : 'Registrar entregas'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -698,5 +888,64 @@ const styles = StyleSheet.create({
     },
     disabledButton: {
         opacity: 0.6,
+    },
+    evidenceButtonsRow: {
+        flexDirection: 'row',
+        marginTop: 12,
+        marginBottom: 8,
+    },
+    addImageButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: COLORS.primary,
+        borderRadius: 12,
+        paddingVertical: 10,
+        gap: 8,
+        backgroundColor: COLORS.primarySurface,
+    },
+    addImageButtonText: {
+        color: COLORS.primary,
+        fontWeight: '600',
+    },
+    imagesPreviewContainer: {
+        marginBottom: 8,
+    },
+    imagesCountText: {
+        fontSize: 12,
+        color: '#4B5563',
+        marginBottom: 8,
+    },
+    imagesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    imageWrapper: {
+        width: 96,
+        height: 96,
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+        backgroundColor: '#E5E7EB',
+    },
+    imagePreview: {
+        width: '100%',
+        height: '100%',
+    },
+    removeImageButton: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        backgroundColor: 'rgba(17, 24, 39, 0.7)',
+        borderRadius: 12,
+        padding: 4,
+    },
+    uploadingText: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginBottom: 8,
     },
 });
