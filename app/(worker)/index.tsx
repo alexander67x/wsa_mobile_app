@@ -1,25 +1,39 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { MapPin, Calendar, ChartBar as BarChart3, Plus, Search } from 'lucide-react-native';
 import { getMyProjects } from '@/services/projects';
 import type { Project } from '@/types/domain';
+import { COLORS } from '@/theme';
 
 export default function WorkerHome() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadProjects = async () => {
+    try {
+      const data = await getMyProjects();
+      setProjects(data);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      setProjects([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     setIsLoading(true);
-    getMyProjects()
-      .then(setProjects)
-      .catch((error) => {
-        console.error('Error loading projects:', error);
-        setProjects([]);
-      })
-      .finally(() => setIsLoading(false));
+    loadProjects();
   }, []);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadProjects();
+  };
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -72,7 +86,18 @@ export default function WorkerHome() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        )}
+      >
         {filteredProjects.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>

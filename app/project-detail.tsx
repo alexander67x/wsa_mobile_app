@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getProject } from '@/services/projects';
 import type { ProjectDetail } from '@/types/domain';
@@ -11,10 +11,27 @@ export default function ProjectDetailScreen() {
   const { projectId } = useLocalSearchParams();
   const [data, setData] = useState<ProjectDetail | null>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'reports' | 'team'>('tasks');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadProject = async () => {
+    try {
+      const project = await getProject(String(projectId || '1'));
+      setData(project);
+    } catch {
+      setData(null);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    getProject(String(projectId || '1')).then(setData).catch(() => setData(null));
+    loadProject();
   }, [projectId]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadProject();
+  };
 
   if (!data) {
     return (
@@ -153,7 +170,18 @@ export default function ProjectDetailScreen() {
           ))}
         </View>
 
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.tabContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={(
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          )}
+        >
           {(() => {
             switch (activeTab) {
               case 'tasks':

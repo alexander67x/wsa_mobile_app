@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Search, MapPin, Calendar, ChartBar as BarChart3, Plus } from 'lucide-react-native';
 import { getMyProjects } from '@/services/projects';
@@ -12,17 +12,29 @@ export default function HomeScreen() {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadProjects = async () => {
+    try {
+      const projectList = await getMyProjects();
+      setProjects(projectList);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      setProjects([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    setIsLoading(true);
-    getMyProjects()
-      .then(setProjects)
-      .catch((error) => {
-        console.error('Error loading projects:', error);
-        setProjects([]);
-      })
-      .finally(() => setIsLoading(false));
+    loadProjects();
   }, []);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadProjects();
+  };
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -100,7 +112,18 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.projectsList} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.projectsList}
+        showsVerticalScrollIndicator={false}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        )}
+      >
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Cargando proyectos...</Text>

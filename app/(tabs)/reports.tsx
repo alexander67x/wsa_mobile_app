@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Calendar, FileText, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Clock, ChartBar as BarChart3 } from 'lucide-react-native';
 import { listReports } from '@/services/reports';
@@ -10,10 +10,27 @@ import { COLORS } from '@/theme';
 export default function ReportsScreen() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [reports, setReports] = useState<Report[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadReports = async () => {
+    try {
+      const data = await listReports();
+      setReports(data);
+    } catch {
+      setReports([]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    listReports().then(setReports).catch(() => setReports([]));
+    loadReports();
   }, []);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadReports();
+  };
 
   const filteredReports = reports.filter(report => {
     if (activeFilter === 'all') return true;
@@ -108,7 +125,18 @@ export default function ReportsScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.reportsList} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.reportsList}
+        showsVerticalScrollIndicator={false}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        )}
+      >
         {filteredReports.map(report => (
           <TouchableOpacity
             key={report.id}

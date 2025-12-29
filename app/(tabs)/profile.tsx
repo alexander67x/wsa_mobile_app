@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import {
   User,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
-import type { Project } from '@/types/domain';
+import type { Project, Report } from '@/types/domain';
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
@@ -105,6 +105,21 @@ function extractEfficiency(me: any): number | undefined {
   return Number.isFinite(asNumber) ? asNumber : undefined;
 }
 
+function computeEfficiencyFromReports(reports: Report[]): number | undefined {
+  if (!reports || reports.length === 0) return undefined;
+  const total = reports.length;
+  const approved = reports.filter(report => report.status === 'approved').length;
+  const percentage = (approved / total) * 100;
+  return Number.isFinite(percentage) ? percentage : undefined;
+}
+
+function normalizeEmployeeId(
+  profile: ProfileData | null,
+  authUser: { employeeId?: string; id: string } | null
+): string | undefined {
+  return profile?.employeeId || authUser?.employeeId || authUser?.id;
+}
+
 function formatDate(value?: string) {
   if (!value) return '';
   const parsed = new Date(value);
@@ -119,46 +134,72 @@ export default function ProfileScreen() {
   const [projectsList, setProjectsList] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isMountedRef = useRef(true);
+
+  const loadProfile = useCallback(async (showInitialSpinner = false) => {
+    if (showInitialSpinner) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const Auth = await import('@/services/auth');
+      const Projects = await import('@/services/projects');
+      const Reports = await import('@/services/reports');
+
+      const [me, projects, reports] = await Promise.all([
+        Auth.fetchMe(),
+        Projects.getMyProjects().catch(() => []),
+        Reports.listReports().catch(() => []),
+      ]);
+
+      if (!isMountedRef.current) return;
+
+      const mappedProfile = mapProfileData(me, Auth.getUser(), Auth.getPermissions());
+      const resolvedRole = Auth.getRole() ?? 'worker';
+      const authUser = Auth.getUser();
+      const referenceEmployeeId = normalizeEmployeeId(mappedProfile, authUser);
+      const reportsData = reports as Report[];
+      const reportsForRole =
+        resolvedRole === 'worker' && referenceEmployeeId
+          ? reportsData.filter(report => {
+              if (!report.authorId) return true;
+              return String(report.authorId) === String(referenceEmployeeId);
+            })
+          : reportsData;
+      const efficiencyFromReports = computeEfficiencyFromReports(reportsForRole);
+      const finalEfficiency = efficiencyFromReports ?? extractEfficiency(me);
+
+      setProfile(mappedProfile);
+      setProjectsList(projects);
+      setStats({
+        projects: projects.length,
+        reports: resolvedRole === 'worker' ? reportsForRole.length : reportsData.length,
+        efficiency: finalEfficiency,
+      });
+    } catch (err) {
+      console.error('Error loading profile', err);
+      if (isMountedRef.current) {
+        setError('No se pudo cargar tu perfil');
+      }
+    } finally {
+      if (!isMountedRef.current) return;
+      if (showInitialSpinner) {
+        setLoading(false);
+      }
+      setIsRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const Auth = await import('@/services/auth');
-        const Projects = await import('@/services/projects');
-        const Reports = await import('@/services/reports');
+    loadProfile(true);
+    return () => { isMountedRef.current = false; };
+  }, [loadProfile]);
 
-        const [me, projects, reports] = await Promise.all([
-          Auth.fetchMe(),
-          Projects.getMyProjects().catch(() => []),
-          Reports.listReports().catch(() => []),
-        ]);
-
-        if (!isMounted) return;
-
-        setProfile(mapProfileData(me, Auth.getUser(), Auth.getPermissions()));
-        setProjectsList(projects);
-        setStats({
-          projects: projects.length,
-          reports: reports.length,
-          efficiency: extractEfficiency(me),
-        });
-      } catch (err) {
-        console.error('Error loading profile', err);
-        if (isMounted) {
-          setError('No se pudo cargar tu perfil');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => { isMounted = false; };
-  }, []);
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadProfile();
+  };
 
   const handleSync = () => {
     setSyncStatus('syncing');
@@ -243,7 +284,17 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        )}
+      >
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
@@ -282,28 +333,6 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.statValue}>{completedProjects.length}</Text>
             <Text style={styles.statLabel}>Proyectos cerrados</Text>
-          </View>
-        </View>
-
-        <View style={styles.efficiencyCard}>
-          <View>
-            <Text style={styles.efficiencyLabel}>Tu eficiencia</Text>
-            <Text style={styles.efficiencyValue}>
-              {stats.efficiency !== undefined ? `${Math.round(stats.efficiency)}%` : 'Sin datos'}
-            </Text>
-            <Text style={styles.efficiencyHint}>
-              {nextMilestoneProject
-                ? `Próximo hito: ${nextMilestoneProject.name}`
-                : 'Mantén tus reportes actualizados para mejorar tu indicador.'}
-            </Text>
-          </View>
-          <View style={styles.efficiencyBar}>
-            <View
-              style={[
-                styles.efficiencyFill,
-                { width: `${Math.min(Math.max(stats.efficiency ?? 0, 0), 100)}%` },
-              ]}
-            />
           </View>
         </View>
 
@@ -601,34 +630,6 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 20, fontWeight: '700', color: COLORS.text },
   statLabel: { color: COLORS.mutedText, fontSize: 12, textAlign: 'center' },
-  efficiencyCard: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    marginTop: 4,
-    borderRadius: 20,
-    padding: 20,
-    backgroundColor: '#111827',
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  efficiencyLabel: { color: '#9CA3AF', fontSize: 13 },
-  efficiencyValue: { color: '#F9FAFB', fontSize: 28, fontWeight: '700', marginTop: 4 },
-  efficiencyHint: { color: '#E5E7EB', marginTop: 4 },
-  efficiencyBar: {
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginTop: 16,
-    overflow: 'hidden',
-  },
-  efficiencyFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#22D3EE',
-  },
   projectsSection: { paddingHorizontal: 20, paddingTop: 24 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionSubtitle: { fontSize: 12, color: COLORS.mutedText },

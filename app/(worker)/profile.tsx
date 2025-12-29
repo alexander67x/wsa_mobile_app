@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { User, LogOut, Phone, Mail, MapPin, ClipboardList, Shield } from 'lucide-react-native';
 import { COLORS } from '@/theme';
@@ -33,24 +33,40 @@ export default function WorkerProfile() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isMountedRef = useRef(true);
+
+  const loadProfile = useCallback(async (showInitialSpinner = false) => {
+    if (showInitialSpinner) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const Auth = await import('@/services/auth');
+      const me = await Auth.fetchMe();
+      if (!isMountedRef.current) return;
+      setProfile(mapProfileData(me, Auth.getUser(), Auth.getPermissions()));
+    } catch (err) {
+      console.error('Error cargando perfil de trabajador', err);
+      if (isMountedRef.current) setError('No se pudo cargar tu perfil');
+    } finally {
+      if (!isMountedRef.current) return;
+      if (showInitialSpinner) {
+        setLoading(false);
+      }
+      setIsRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        const Auth = await import('@/services/auth');
-        const me = await Auth.fetchMe();
-        if (!isMounted) return;
-        setProfile(mapProfileData(me, Auth.getUser(), Auth.getPermissions()));
-      } catch (err) {
-        console.error('Error cargando perfil de trabajador', err);
-        if (isMounted) setError('No se pudo cargar tu perfil');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-    return () => { isMounted = false; };
-  }, []);
+    loadProfile(true);
+    return () => { isMountedRef.current = false; };
+  }, [loadProfile]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadProfile();
+  };
 
   const handleLogout = async () => {
     const Auth = await import('@/services/auth');
@@ -90,7 +106,17 @@ export default function WorkerProfile() {
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        )}
+      >
         <View style={styles.header}>
           <View style={styles.avatar}><User size={40} color="#FFFFFF" /></View>
           <Text style={styles.name}>{profile?.name || 'Usuario'}</Text>

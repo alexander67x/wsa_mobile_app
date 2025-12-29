@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
 import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
-import { listCatalog } from '@/services/materials';
+import { listCatalog, createMaterialRequest } from '@/services/materials';
 import { getMyProjects } from '@/services/projects';
 import type { CatalogItem } from '@/types/domain';
 
@@ -169,31 +169,42 @@ export default function RequestMaterialScreen() {
       return;
     }
 
-    setIsSubmitting(true);
+    const itemsPayload = materialRequests.map(item => {
+      const numericId = Number(item.materialId);
+      const materialId = Number.isFinite(numericId) ? numericId : item.materialId;
+      return {
+        materialId,
+        qty: item.quantity,
+      };
+    });
+    const observationsValue = observations.trim();
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setIsSubmitting(true);
+    try {
+      const { id } = await createMaterialRequest({
+        projectId: selectedProject,
+        items: itemsPayload,
+        deliveryDate,
+        priority: priority as 'low' | 'medium' | 'high',
+        observations: observationsValue ? observationsValue : undefined,
+      });
+
       Alert.alert(
         'Solicitud enviada',
-        'Tu solicitud fue enviada y esta en revision.',
+        'Tu solicitud fue enviada y está en revisión.',
         [
           {
-            text: 'Ver solicitudes',
-            onPress: () => router.push('/material-requests'),
-          },
-          {
-            text: 'Crear nueva',
-            onPress: () => {
-              setSelectedProject('');
-              setMaterialRequests([]);
-              setPriority('medium');
-              setObservations('');
-              setDeliveryDate('');
-            },
+            text: 'Ir a Materiales',
+            onPress: () => router.replace('/materials'),
           },
         ]
       );
-    }, 2000);
+    } catch (error: any) {
+      console.error('Error creating material request', error);
+      Alert.alert('Error', error?.message || 'No se pudo enviar la solicitud');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

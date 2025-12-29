@@ -503,18 +503,47 @@ export async function listCatalog(projectId?: string): Promise<CatalogItem[]> {
   }));
 }
 
-export async function createMaterialRequest(payload: {
+export interface CreateMaterialRequestInput {
   projectId: string;
   items: Array<{
     materialId: string | number;
     qty: number;
   }>;
-}): Promise<{ id: string }> {
+  priority?: MaterialPriority;
+  deliveryDate?: string;
+  observations?: string;
+}
+
+type CreateMaterialRequestApiBody = CreateMaterialRequestInput & {
+  requiredDate?: string;
+  fechaRequerida?: string;
+};
+
+export async function createMaterialRequest(
+  payload: CreateMaterialRequestInput
+): Promise<{ id: string }> {
   if (USE_MOCKS) return Promise.resolve({ id: 'mock' });
+
+  const requestBody: CreateMaterialRequestApiBody = {
+    projectId: payload.projectId,
+    items: payload.items,
+  };
+
+  if (payload.priority) {
+    requestBody.priority = payload.priority;
+  }
+  if (payload.observations) {
+    requestBody.observations = payload.observations;
+  }
+  if (payload.deliveryDate) {
+    requestBody.deliveryDate = payload.deliveryDate;
+    requestBody.requiredDate = payload.deliveryDate;
+    requestBody.fechaRequerida = payload.deliveryDate;
+  }
 
   const response = await fetchJson<{ id: string }, typeof payload>(
     '/materials/requests',
-    { method: 'POST', body: payload }
+    { method: 'POST', body: requestBody }
   );
 
   return { id: String(response.id) };
