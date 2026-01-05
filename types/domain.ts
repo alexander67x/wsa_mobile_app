@@ -70,8 +70,6 @@ export interface ReportDetail {
   feedback?: string;
 }
 
-export type MaterialPriority = 'low' | 'medium' | 'high';
-
 export type MaterialRequestStatus =
   | 'draft'
   | 'pending'
@@ -114,7 +112,8 @@ export interface MaterialRequest {
   requestDate: string;
   status: MaterialRequestStatus;
   statusLabel?: string;
-  priority: MaterialPriority;
+  urgent: boolean;
+  reason?: string;
   observations?: string;
   deliveryProgress?: number;
   totalItems?: number;

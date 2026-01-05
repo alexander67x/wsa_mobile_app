@@ -1,4 +1,3 @@
-import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 
 type AuthUser = { id: string; name: string; role: 'supervisor' | 'worker'; employeeId?: string };
@@ -209,23 +208,6 @@ async function completeLoginFlow(baseResponse: NormalizedAuthResponse): Promise<
 }
 
 export async function login(username: string, password: string): Promise<{ token: string; role: 'supervisor' | 'worker'; user: { id: string; name: string; employeeId?: string } }>{
-  if (USE_MOCKS) {
-    // Mock rule: admin/123456 ok
-    if (username === 'admin' && password === '123456') {
-      memoryToken = 'mock-token';
-      memoryRole = 'supervisor';
-      memoryUser = { id: 'sup1', name: 'J. Salazar', role: 'supervisor' };
-      return { token: memoryToken, role: memoryRole, user: { id: memoryUser.id, name: memoryUser.name, employeeId: memoryUser.employeeId } };
-    }
-    if ((username === 'obra' || username === 'worker') && password === '123456') {
-      memoryToken = 'mock-token-worker';
-      memoryRole = 'worker';
-      memoryUser = { id: 'u1', name: 'Juan Pérez', role: 'worker' };
-      return { token: memoryToken, role: memoryRole, user: { id: memoryUser.id, name: memoryUser.name, employeeId: memoryUser.employeeId } };
-    }
-    throw new Error('Credenciales inválidas');
-  }
-
   // Real API call - API expects 'email' but we accept username/email
   // Try username as email directly first, then try with @example.com if it doesn't contain @
   let email = username;
@@ -251,7 +233,7 @@ export async function login(username: string, password: string): Promise<{ token
 }
 
 export async function fetchMe(): Promise<({ id: string; name: string; role: ApiRolePayload; permissions?: string[] } & Record<string, any>) | null> {
-  if (USE_MOCKS || !memoryToken) return null;
+  if (!memoryToken) return null;
   try {
     const me = await fetchJson<{ id: string; name: string; role: ApiRolePayload; permissions?: string[] } & Record<string, any>>('/auth/me', { token: memoryToken });
     hydrateRoleState(me.role ?? null);
@@ -263,7 +245,7 @@ export async function fetchMe(): Promise<({ id: string; name: string; role: ApiR
 }
 
 export async function logout(): Promise<void> {
-  if (!USE_MOCKS && memoryToken) {
+  if (memoryToken) {
     try {
       await fetchJson('/auth/logout', {
         method: 'POST',

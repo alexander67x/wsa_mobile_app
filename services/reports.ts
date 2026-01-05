@@ -1,8 +1,6 @@
-import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 import { Report, ReportDetail } from '@/types/domain';
-import { mockReports, mockReportDetail } from '@/mocks/reports';
-import { getUser, getRole } from '@/services/auth';
+import { getUser, getRole, getRoleSlug } from '@/services/auth';
 import { getMyProjects } from '@/services/projects';
 
 interface ApiReport {
@@ -49,9 +47,56 @@ interface ApiReportDetail {
   materialsUsed: string | null;
 }
 
+type MaybeString = string | null | undefined;
+
+const normalizeString = (value: MaybeString): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  const trimmed = String(value).trim();
+  return trimmed.length ? trimmed : undefined;
+};
+
+const toMaybeString = (value: unknown): MaybeString => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return undefined;
+};
+
+const pickString = (source: Record<string, unknown>, ...keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const normalized = normalizeString(toMaybeString(source[key]));
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return undefined;
+};
+
+const mapReportStatus = (status?: MaybeString): Report['status'] => {
+  const normalized = normalizeString(status)?.toLowerCase();
+  switch (normalized) {
+    case 'approved':
+    case 'aprobado':
+    case 'aprobada':
+      return 'approved';
+    case 'rejected':
+    case 'rechazado':
+    case 'rechazada':
+      return 'rejected';
+    case 'pending':
+    case 'pendiente':
+    case 'en_revision':
+    case 'en revision':
+    case 'en_proceso':
+      return 'pending';
+    default:
+      return 'pending';
+  }
+};
+
 export async function listReports(projectId?: string, taskId?: string): Promise<(Report & { taskId?: string; taskTitle?: string })[]> {
-  if (USE_MOCKS) return Promise.resolve(mockReports);
-  
   const user = getUser();
   const role = getRole();
   const ensuredEmployeeId = await (await import('@/services/auth')).ensureEmployeeId();
@@ -85,44 +130,166 @@ export async function listReports(projectId?: string, taskId?: string): Promise<
     }
   }
   
-  return filteredReports.map((r): Report & { taskId?: string; taskTitle?: string } => ({
-    id: r.id,
-    title: r.title,
-    project: r.project || 'Sin proyecto',
-    date: r.date || '',
-    type: (r.type === 'progress' ? 'progress' : r.type === 'incident' ? 'incident' : 'quality') as 'progress' | 'incident' | 'quality',
-    status: r.status,
-    progress: r.progress || undefined,
-    authorId: r.authorId || undefined,
-    authorName: r.authorName || undefined,
-    taskId: r.taskId || undefined,
-    taskTitle: r.taskTitle || undefined,
-  }));
+  return filteredReports.map((r): Report & { taskId?: string; taskTitle?: string } => {
+    const raw = r as Record<string, unknown>;
+    const status = mapReportStatus(
+      r.status ??
+      toMaybeString(raw.estado) ??
+      toMaybeString(raw.statusLabel) ??
+      toMaybeString(raw.estado_label)
+    );
+
+    const typeValue =
+      r.type === 'incident'
+        ? 'incident'
+        : r.type === 'quality'
+          ? 'quality'
+          : 'progress';
+
+    const projectName =
+      normalizeString(r.project) ??
+      pickString(raw, 'projectName', 'project_name', 'proyecto', 'obra') ??
+      'Sin proyecto';
+
+    const dateValue =
+      normalizeString(r.date) ?? pickString(raw, 'fecha', 'reportDate', 'fecha_reporte', 'fechaReporte') ?? '';
+
+    const titleValue = normalizeString(r.title) ?? pickString(raw, 'nombre', 'titulo') ?? 'Reporte';
+    const progressValue =
+      typeof r.progress === 'number'
+        ? r.progress
+        : typeof raw.avance === 'number'
+          ? (raw.avance as number)
+          : typeof raw.progressPercentage === 'number'
+            ? (raw.progressPercentage as number)
+            : undefined;
+
+    return {
+      id: r.id,
+      title: titleValue,
+      project: projectName,
+      date: dateValue,
+      type: typeValue,
+      status,
+      progress: progressValue || undefined,
+      authorId: r.authorId || undefined,
+      authorName:
+        (r.authorName ?? pickString(raw, 'author', 'autor', 'autorNombre', 'autor_nombre')) || undefined,
+      taskId: r.taskId || undefined,
+      taskTitle: r.taskTitle || undefined,
+    };
+  });
 }
 
 export async function getReport(id: string): Promise<ReportDetail & { taskId?: string; taskTitle?: string; taskDescription?: string; taskStatus?: string }> {
-  if (USE_MOCKS) return Promise.resolve(mockReportDetail);
-  
   const apiReport = await fetchJson<ApiReportDetail>(`/reports/${id}`);
-  
+  const raw = apiReport as Record<string, unknown>;
+
+  const status = mapReportStatus(
+    apiReport.status ??
+    toMaybeString(raw.estado) ??
+    toMaybeString(raw.statusLabel) ??
+    toMaybeString(raw.estado_label)
+  );
+
+  const typeValue =
+    apiReport.type === 'incident'
+      ? 'incident'
+      : apiReport.type === 'quality'
+        ? 'quality'
+        : 'progress';
+
+  const projectName =
+    normalizeString(apiReport.project) ??
+    pickString(raw, 'projectName', 'project_name', 'proyecto', 'obra') ??
+    'Sin proyecto';
+
+  const authorName =
+    normalizeString(apiReport.author) ??
+    pickString(raw, 'authorName', 'author_name', 'autor', 'autorNombre', 'autor_nombre') ??
+    'Desconocido';
+
+  const dateValue =
+    normalizeString(apiReport.date) ?? pickString(raw, 'fecha', 'fecha_reporte', 'reportDate', 'fechaReporte') ?? '';
+
+  const locationValue = normalizeString(apiReport.location) ?? pickString(raw, 'ubicacion') ?? '';
+  const descriptionValue = normalizeString(apiReport.description) ?? pickString(raw, 'descripcion') ?? '';
+  const observationsValue = normalizeString(apiReport.observations) ?? pickString(raw, 'observaciones');
+
+  const approvedBy = pickString(
+    raw,
+    'approvedBy',
+    'approved_by',
+    'aprobadoPor',
+    'aprobado_por',
+    'aprobadoPorNombre',
+    'aprobado_por_nombre'
+  );
+  const approvedDate = pickString(
+    raw,
+    'approvedDate',
+    'approved_date',
+    'approvedAt',
+    'approved_at',
+    'fechaAprobacion',
+    'fecha_aprobacion'
+  );
+
+  const rejectedBy = pickString(
+    raw,
+    'rejectedBy',
+    'rejected_by',
+    'rechazadoPor',
+    'rechazado_por',
+    'rechazadoPorNombre',
+    'rechazado_por_nombre'
+  );
+  const rejectedDate = pickString(
+    raw,
+    'rejectedDate',
+    'rejected_date',
+    'rejectedAt',
+    'rejected_at',
+    'fechaRechazo',
+    'fecha_rechazo'
+  );
+
+  const feedback = pickString(
+    raw,
+    'feedback',
+    'rejectionComments',
+    'rejection_comments',
+    'comentariosRechazo',
+    'comentarioRechazo',
+    'approvalComments',
+    'comentariosAprobacion'
+  );
+
+  const resolvedApprovedBy = approvedBy || undefined;
+  const resolvedApprovedDate = approvedDate || undefined;
+  const resolvedRejectedBy =
+    rejectedBy || (status === 'rejected' ? resolvedApprovedBy : undefined);
+  const resolvedRejectedDate =
+    rejectedDate || (status === 'rejected' ? resolvedApprovedDate : undefined);
+
   return {
     id: apiReport.id,
     title: apiReport.title,
-    project: apiReport.project || 'Sin proyecto',
-    type: (apiReport.type === 'progress' ? 'progress' : apiReport.type === 'incident' ? 'incident' : 'quality') as 'progress' | 'incident' | 'quality',
-    status: apiReport.status,
+    project: projectName,
+    type: typeValue,
+    status,
     progress: undefined,
-    author: apiReport.author || 'Desconocido',
-    date: apiReport.date || '',
-    location: apiReport.location || '',
-    description: apiReport.description,
-    observations: apiReport.observations || undefined,
+    author: authorName,
+    date: dateValue,
+    location: locationValue,
+    description: descriptionValue,
+    observations: observationsValue,
     images: apiReport.images || [],
-    approvedBy: apiReport.approvedBy || undefined,
-    approvedDate: apiReport.approvedDate || undefined,
-    rejectedBy: apiReport.rejectedBy || undefined,
-    rejectedDate: apiReport.rejectedDate || undefined,
-    feedback: apiReport.feedback || apiReport.rejectionComments || apiReport.approvalComments || undefined,
+    approvedBy: resolvedApprovedBy,
+    approvedDate: resolvedApprovedDate,
+    rejectedBy: resolvedRejectedBy,
+    rejectedDate: resolvedRejectedDate,
+    feedback: feedback || undefined,
     taskId: apiReport.taskId || undefined,
     taskTitle: apiReport.taskTitle || undefined,
     taskDescription: apiReport.taskDescription || undefined,
@@ -158,8 +325,10 @@ export async function createReport(payload: {
   images?: ReportImage[];
   materials?: ReportMaterial[];
 }): Promise<{ id: string }> {
-  if (USE_MOCKS) return Promise.resolve({ id: 'mock' });
-  
+  const roleSlug = getRoleSlug();
+  if (roleSlug === 'responsable_proyecto') {
+    throw new Error('Los responsables de proyecto no pueden enviar reportes.');
+  }
   const response = await fetchJson<{ id: string; report: ApiReport }, typeof payload>(
     '/reports',
     { method: 'POST', body: payload }

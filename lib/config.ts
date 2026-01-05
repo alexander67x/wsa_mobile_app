@@ -6,6 +6,3 @@
 export const API_URL = 'http://192.168.26.4:8081/api';
 
 
-// Force disable mocks in code. Set to `true` to re-enable local mocks.
-export const USE_MOCKS = false;
-

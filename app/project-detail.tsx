@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getProject } from '@/services/projects';
+import { listReports } from '@/services/reports';
 import type { ProjectDetail } from '@/types/domain';
 import { ArrowLeft, Calendar, MapPin, Users, User, ChartBar as BarChart3, FileText } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -15,8 +16,12 @@ export default function ProjectDetailScreen() {
 
   const loadProject = async () => {
     try {
-      const project = await getProject(String(projectId || '1'));
-      setData(project);
+      const targetId = String(projectId || '1');
+      const [project, projectReports] = await Promise.all([
+        getProject(targetId),
+        listReports(targetId),
+      ]);
+      setData({ ...project, reports: projectReports });
     } catch {
       setData(null);
     } finally {
@@ -263,7 +268,10 @@ export default function ProjectDetailScreen() {
         </ScrollView>
 
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} onPress={() => router.push('/kanban')}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.secondaryButton]}
+            onPress={() => router.push({ pathname: '/kanban', params: { projectId: data.id } })}
+          >
             <FileText size={20} color={COLORS.primary} />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>Ver Kanban</Text>
           </TouchableOpacity>

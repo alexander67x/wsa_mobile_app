@@ -8,7 +8,7 @@ import * as Location from 'expo-location';
 import { getProject } from '@/services/projects';
 import { createReport, type ReportImage, type ReportMaterial } from '@/services/reports';
 import { createIncident, type IncidentImage } from '@/services/incidencias';
-import { getUser } from '@/services/auth';
+import { getUser, getRoleSlug } from '@/services/auth';
 import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { listCatalog } from '@/services/materials';
 import type { ProjectDetail } from '@/types/domain';
@@ -58,6 +58,10 @@ export default function CreateReportScreen() {
   const [sendAsIncident, setSendAsIncident] = useState(sendAsIncidentParam === 'true');
   const [incidentType, setIncidentType] = useState<'falla_equipos' | 'accidente' | 'retraso_material' | 'problema_calidad' | 'otro'>('otro');
   const [incidentSeverity, setIncidentSeverity] = useState<'critica' | 'alta' | 'media' | 'baja'>('media');
+  const roleSlug = getRoleSlug();
+  const isProjectLeadRole = roleSlug === 'responsable_proyecto';
+  const isReportCreationRestricted = isProjectLeadRole && !sendAsIncident;
+  const saveButtonDisabled = isSubmitting || isReportCreationRestricted;
 
   const handleToggleChange = (value: boolean) => {
     setSendAsIncident(value);
@@ -313,6 +317,10 @@ export default function CreateReportScreen() {
   };
 
   const handleSave = async () => {
+    if (isReportCreationRestricted) {
+      Alert.alert('Acceso restringido', 'Los responsables de proyecto no pueden enviar reportes desde la aplicación.');
+      return;
+    }
     if (!projectId) {
       Alert.alert('Error', 'Faltan parámetros necesarios (proyecto)');
       return;
@@ -800,18 +808,20 @@ export default function CreateReportScreen() {
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
-            style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
+            style={[styles.saveButton, saveButtonDisabled && styles.saveButtonDisabled]}
             onPress={handleSave}
-            disabled={isSubmitting}
+            disabled={saveButtonDisabled}
           >
             <Save size={20} color="#FFFFFF" />
             <Text style={styles.saveButtonText}>
-              {isUploadingImages 
-                ? 'Subiendo imágenes...' 
-                : isSubmitting 
-                ? 'Guardando...' 
-                : sendAsIncident 
-                ? 'Guardar Incidencia' 
+              {isUploadingImages
+                ? 'Subiendo imágenes...'
+                : isSubmitting
+                ? 'Guardando...'
+                : isReportCreationRestricted
+                ? 'Sin permisos para reportar'
+                : sendAsIncident
+                ? 'Guardar Incidencia'
                 : 'Guardar Reporte'}
             </Text>
           </TouchableOpacity>

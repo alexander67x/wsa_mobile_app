@@ -1,83 +1,324 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
-import { ArrowLeft, Plus, Clock, Play, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ArrowLeft, Clock, Play, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Kanban from '@/services/kanban';
+import type { KanbanBoard, KanbanCard } from '@/types/domain';
 import { COLORS } from '@/theme';
 
-interface KanbanTask {
-  id: string;
-  title: string;
-  project: string;
-  assignee: string;
-  priority: 'low' | 'medium' | 'high';
-  type: 'task' | 'report';
-}
+type ExtendedKanbanCard = KanbanCard & {
+  project?: string;
+  projectName?: string;
+  projectId?: string | number;
+  taskId?: string | number;
+  task?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+  assignee?: string;
+  assigneeName?: string;
+  priority?: string;
+  type?: string;
+  status?: string;
+  column?: string;
+};
 
-interface KanbanData {
-  pending: KanbanTask[];
-  in_progress: KanbanTask[];
-  completed: KanbanTask[];
-}
+const DEFAULT_COLUMNS = ['pending', 'review', 'completed'] as const;
+type ColumnKey = typeof DEFAULT_COLUMNS[number];
 
-const mockKanbanData: KanbanData = {
-  pending: [
-    { id: '1', title: 'Tendido de UTP – Nivel 2', project: 'Green Tower', assignee: 'Luis M.', priority: 'high', type: 'task' },
-    { id: '2', title: 'Reporte de pruebas de sensores', project: 'Parque Industrial Orión', assignee: 'Karla G.', priority: 'medium', type: 'report' },
-    { id: '3', title: 'Montaje de cámaras – Lobby', project: 'Green Tower', assignee: 'Carlos R.', priority: 'medium', type: 'task' },
-  ],
-  in_progress: [
-    { id: '4', title: 'Configuración NVR principal', project: 'Data Center Norte', assignee: 'Ana T.', priority: 'high', type: 'task' },
-    { id: '5', title: 'Incidente: caída de enlace PoE', project: 'Campus Corporativo Andina', assignee: 'Pedro L.', priority: 'high', type: 'report' },
-  ],
-  completed: [
-    { id: '6', title: 'Instalación sirenas exteriores', project: 'Green Tower', assignee: 'Roberto S.', priority: 'high', type: 'task' },
-    { id: '7', title: 'Avance semanal – Data Center', project: 'Data Center Norte', assignee: 'Lucía M.', priority: 'medium', type: 'report' },
-    { id: '8', title: 'Calibración de cámaras PTZ', project: 'Parque Industrial Orión', assignee: 'Diego F.', priority: 'low', type: 'task' },
-  ],
+const normalizeKey = (value?: string | null): string => {
+  if (!value) return '';
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_');
+};
+
+const mapColumnToLane = (value: string): ColumnKey => {
+  const normalized = normalizeKey(value);
+  if (
+    ['pending', 'pendiente', 'pendientes', 'sin_reporte', 'sin_reportes', 'sin_reporte_de_avance', 'sin_avance', 'sin_avances', 'no_reportado', 'no_reportados', 'no_reportes', 'por_enviar', 'por_reportar', 'nuevo', 'nuevos']
+      .includes(normalized)
+  ) {
+    return 'pending';
+  }
+  if (
+    ['review', 'en_revision', 'revision', 'revisado', 'revisados', 'revisada', 'revisadas', 'reenviado', 'reenviados', 'reenviada', 'reenviadas', 'reenvio', 'in_progress', 'proceso', 'por_revision']
+      .includes(normalized)
+  ) {
+    return 'review';
+  }
+  if (
+    ['completed', 'complete', 'finalizado', 'finalizados', 'finalizada', 'finalizadas', 'terminado', 'terminados', 'terminada', 'terminadas', 'cerrado', 'cerrados', 'cerrada', 'cerradas', 'aprobado', 'aprobados', 'aprobada', 'aprobadas', 'rechazado', 'rechazados', 'rechazada', 'rechazadas', 'approved', 'rejected']
+      .includes(normalized)
+  ) {
+    return 'completed';
+  }
+  return 'pending';
+};
+
+const groupBoard = (rawBoard: KanbanBoard): Record<ColumnKey, ExtendedKanbanCard[]> => {
+  const grouped: Record<ColumnKey, ExtendedKanbanCard[]> = {
+    pending: [],
+    review: [],
+    completed: [],
+  };
+
+  Object.entries(rawBoard || {}).forEach(([columnName, cards]) => {
+    (cards || []).forEach(card => {
+      const hintedColumn =
+        (card as ExtendedKanbanCard).column ??
+        (card as any).status ??
+        (card as any).taskStatus ??
+        (card as any).reportStatus ??
+        columnName;
+      const lane = mapColumnToLane(String(hintedColumn || columnName || ''));
+      grouped[lane].push(card as ExtendedKanbanCard);
+    });
+  });
+
+  return grouped;
+};
+
+const toOptionalString = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  const str = String(value).trim();
+  return str.length ? str : undefined;
+};
+
+const asTaskObject = (card: ExtendedKanbanCard): Record<string, unknown> | undefined => {
+  const task = card.task;
+  return task && typeof task === 'object' ? task : undefined;
 };
 
 export default function KanbanScreen() {
-  const [kanbanData, setKanbanData] = useState(mockKanbanData);
+  const params = useLocalSearchParams<{ projectId?: string | string[] }>();
+  const projectId = useMemo(() => {
+    const value = params.projectId;
+    if (!value) return undefined;
+    return Array.isArray(value) ? value[0] : value;
+  }, [params.projectId]);
+  const [board, setBoard] = useState<KanbanBoard>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return '#EF4444';
-      case 'medium': return '#F59E0B';
-      case 'low': return '#10B981';
+  const loadBoard = useCallback(async () => {
+    if (!projectId) {
+      setLoading(false);
+      setBoard({});
+      setError('Selecciona un proyecto para ver su tablero.');
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await Kanban.getBoard(projectId);
+      setBoard(data || {});
+    } catch (err) {
+      console.error('Error fetching Kanban board', err);
+      setError('No se pudo cargar el tablero. Intenta nuevamente.');
+      setBoard({});
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    loadBoard();
+  }, [loadBoard]);
+
+  const groupedBoard = useMemo(() => groupBoard(board), [board]);
+  const columns = DEFAULT_COLUMNS;
+
+  const getPriorityColor = (priority?: string) => {
+    switch ((priority || '').toLowerCase()) {
+      case 'high':
+      case 'alta':
+        return '#EF4444';
+      case 'medium':
+      case 'media':
+        return '#F59E0B';
+      case 'low':
+      case 'baja':
+        return '#10B981';
       default: return '#6B7280';
     }
   };
 
-  const getColumnIcon = (column: string) => {
+  const getColumnIcon = (column: ColumnKey) => {
     switch (column) {
       case 'pending': return <Clock size={20} color="#F59E0B" />;
-      case 'in_progress': return <Play size={20} color={COLORS.primary} />;
+      case 'review': return <Play size={20} color={COLORS.primary} />;
       case 'completed': return <CheckCircle size={20} color="#10B981" />;
       default: return null;
     }
   };
 
-  const getColumnTitle = (column: string) => {
+  const getColumnTitle = (column: ColumnKey) => {
     switch (column) {
       case 'pending': return 'Pendientes';
-      case 'in_progress': return 'En Proceso';
+      case 'review': return 'En revision';
       case 'completed': return 'Finalizadas';
       default: return column;
     }
   };
 
-  const getColumnColor = (column: string) => {
+  const getColumnColor = (column: ColumnKey) => {
     switch (column) {
       case 'pending': return '#FEF3C7';
-      case 'in_progress': return '#DBEAFE';
+      case 'review': return '#DBEAFE';
       case 'completed': return '#DCFCE7';
       default: return '#F3F4F6';
     }
   };
 
-  const renderColumn = (column: keyof KanbanData) => {
-    const tasks = kanbanData[column];
+  const getCardProject = (card: ExtendedKanbanCard) => {
+    const task = asTaskObject(card);
+    if (task) {
+      const project = task.project;
+      if (project && typeof project === 'object') {
+        const name =
+          toOptionalString((project as { name?: string }).name) ??
+          toOptionalString((project as { nombre?: string }).nombre);
+        if (name) return name;
+      }
+      const projectName =
+        toOptionalString((task as { projectName?: string }).projectName) ??
+        toOptionalString((task as { project_label?: string }).project_label) ??
+        toOptionalString((task as { projectTitle?: string }).projectTitle);
+      if (projectName) return projectName;
+    }
+    const rawProject = (card as any).project;
+    if (rawProject && typeof rawProject === 'object') {
+      const name = (rawProject as { name?: string; nombre?: string }).name ?? (rawProject as { name?: string; nombre?: string }).nombre;
+      if (typeof name === 'string' && name.trim()) return name;
+    }
+    if (typeof rawProject === 'string' && rawProject.trim()) return rawProject;
+    return (
+      card.project ??
+      card.projectName ??
+      (card as any).projectTitle ??
+      (card as any).project_label ??
+      'Proyecto sin nombre'
+    );
+  };
+
+  const getCardAssignee = (card: ExtendedKanbanCard) => {
+    const task = asTaskObject(card);
+    if (task) {
+      const assignee =
+        toOptionalString((task as { assignee?: string }).assignee) ??
+        toOptionalString((task as { assigneeName?: string }).assigneeName) ??
+        toOptionalString((task as { assignedTo?: string }).assignedTo) ??
+        toOptionalString((task as { assigned_to?: string }).assigned_to) ??
+        toOptionalString((task as { responsable?: string }).responsable);
+      if (assignee) return assignee;
+      const assigneeObj = (task as { assignee?: { name?: string; nombre?: string } }).assignee;
+      if (assigneeObj && typeof assigneeObj === 'object') {
+        const name =
+          toOptionalString((assigneeObj as { name?: string }).name) ??
+          toOptionalString((assigneeObj as { nombre?: string }).nombre);
+        if (name) return name;
+      }
+    }
+    return (
+      card.assignee ??
+      card.assigneeName ??
+      (card as any).assignedTo ??
+      (card as any).assigned_to ??
+      card.authorName ??
+      'Sin asignar'
+    );
+  };
+
+  const getCardType = (card: ExtendedKanbanCard) => {
+    const task = asTaskObject(card);
+    const normalized = (card.type ?? (task as { type?: string })?.type ?? '').toLowerCase();
+    if (normalized === 'report' || normalized === 'reporte') return 'report';
+    return 'task';
+  };
+
+  const getCardPriority = (card: ExtendedKanbanCard): string | undefined => {
+    const task = asTaskObject(card);
+    const priority =
+      card.priority ??
+      (card as any).priority ??
+      (task as { priority?: string })?.priority ??
+      (task as { prioridad?: string })?.prioridad ??
+      (task as { priorityLabel?: string })?.priorityLabel ??
+      (task as { prioridadLabel?: string })?.prioridadLabel;
+    return toOptionalString(priority);
+  };
+
+  const resolveProjectId = (card: ExtendedKanbanCard, fallback?: string): string | undefined => {
+    const task = asTaskObject(card);
+    if (task) {
+      const taskProject = (task as { project?: Record<string, unknown> | string }).project;
+      if (taskProject && typeof taskProject === 'object') {
+        const nested = toOptionalString(
+          (taskProject as { id?: string | number }).id ??
+          (taskProject as { projectId?: string | number }).projectId ??
+          (taskProject as { project_id?: string | number }).project_id
+        );
+        if (nested) return nested;
+      }
+      const directTaskProjectId = toOptionalString(
+        (task as { projectId?: string | number }).projectId ??
+        (task as { project_id?: string | number }).project_id
+      );
+      if (directTaskProjectId) return directTaskProjectId;
+    }
+
+    const directProject = (card as any).project;
+    if (directProject && typeof directProject === 'object') {
+      const nested = toOptionalString(
+        (directProject as { id?: string | number }).id ??
+        (directProject as { projectId?: string | number }).projectId ??
+        (directProject as { project_id?: string | number }).project_id
+      );
+      if (nested) return nested;
+    }
+
+    const resolved =
+      toOptionalString(card.projectId) ??
+      toOptionalString((card as any).projectId) ??
+      toOptionalString((card as any).project_id) ??
+      toOptionalString((card.metadata as { projectId?: string | number })?.projectId) ??
+      toOptionalString((card.metadata as { project_id?: string | number })?.project_id);
+
+    if (resolved) return resolved;
+    return fallback;
+  };
+
+  const resolveTaskId = (card: ExtendedKanbanCard): string | undefined => {
+    const task = asTaskObject(card);
+    if (task) {
+      const nestedTaskId = toOptionalString(
+        (task as { id?: string | number }).id ??
+        (task as { taskId?: string | number }).taskId ??
+        (task as { task_id?: string | number }).task_id
+      );
+      if (nestedTaskId) return nestedTaskId;
+    }
+    const directId = toOptionalString(
+      card.taskId ?? (card as any).taskId ?? (card as any).task_id ?? (card.metadata as { taskId?: string | number })?.taskId
+    );
+    if (directId) return directId;
+    return toOptionalString(card.id);
+  };
+
+  const handleCardPress = (card: ExtendedKanbanCard) => {
+    const resolvedProjectId = resolveProjectId(card, projectId);
+    const taskId = resolveTaskId(card);
+    if (!resolvedProjectId || !taskId) {
+      Alert.alert('Sin detalles disponibles', 'No se encontro informacion suficiente de la tarea.');
+      return;
+    }
+    router.push({ pathname: '/task-detail', params: { projectId: resolvedProjectId, taskId } });
+  };
+
+  const renderColumn = (column: ColumnKey) => {
+    const tasks = groupedBoard[column] ?? [];
 
     return (
       <View key={column} style={styles.column}>
@@ -90,26 +331,23 @@ export default function KanbanScreen() {
         </View>
 
         <ScrollView style={styles.columnContent} showsVerticalScrollIndicator={false}>
-          {tasks.map(task => (
-            <View key={task.id} style={styles.taskCard}>
+          {tasks.length ? tasks.map(task => (
+            <TouchableOpacity key={task.id} style={styles.taskCard} activeOpacity={0.85} onPress={() => handleCardPress(task)}>
               <View style={styles.taskHeader}>
-                <Text style={styles.taskType}>{task.type === 'report' ? 'REP' : 'TAR'}</Text>
-                <View style={[styles.priorityIndicator, { backgroundColor: getPriorityColor(task.priority) }]} />
+                <Text style={styles.taskType}>{getCardType(task) === 'report' ? 'REP' : 'TAR'}</Text>
+                <View style={[styles.priorityIndicator, { backgroundColor: getPriorityColor(getCardPriority(task)) }]} />
               </View>
 
               <Text style={styles.taskTitle}>{task.title}</Text>
-              <Text style={styles.taskProject}>{task.project}</Text>
+              <Text style={styles.taskProject}>{getCardProject(task)}</Text>
 
               <View style={styles.taskFooter}>
-                <Text style={styles.taskAssignee}>{task.assignee}</Text>
+                <Text style={styles.taskAssignee}>{getCardAssignee(task)}</Text>
               </View>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addTaskButton}>
-            <Plus size={16} color="#6B7280" />
-            <Text style={styles.addTaskText}>Agregar {column === 'pending' ? 'tarea' : 'elemento'}</Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )) : (
+            <Text style={styles.emptyText}>Sin elementos</Text>
+          )}
         </ScrollView>
       </View>
     );
@@ -128,11 +366,23 @@ export default function KanbanScreen() {
       </View>
 
       <View style={styles.content}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kanbanBoard}>
-          {renderColumn('pending')}
-          {renderColumn('in_progress')}
-          {renderColumn('completed')}
-        </ScrollView>
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.centerText}>Cargando tablero...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.center}>
+            <Text style={styles.centerText}>{error}</Text>
+            <TouchableOpacity onPress={loadBoard} style={styles.retryButton}>
+              <Text style={styles.retryText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kanbanBoard}>
+            {columns.map(column => renderColumn(column))}
+          </ScrollView>
+        )}
       </View>
 
       <View style={styles.legendContainer}>
@@ -177,8 +427,11 @@ const styles = StyleSheet.create({
   taskProject: { fontSize: 12, color: '#6B7280' },
   taskFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   taskAssignee: { color: '#6B7280' },
-  addTaskButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 8 },
-  addTaskText: { marginLeft: 6, color: '#6B7280' },
+  emptyText: { textAlign: 'center', color: '#9CA3AF', paddingVertical: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  centerText: { marginTop: 8, color: '#6B7280', textAlign: 'center' },
+  retryButton: { marginTop: 12, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: COLORS.primary },
+  retryText: { color: '#FFFFFF', fontWeight: '600' },
   legendContainer: { padding: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E5E7EB' },
   legendTitle: { fontWeight: '700', color: '#111827' },
   legendItems: { flexDirection: 'row', marginTop: 8 },

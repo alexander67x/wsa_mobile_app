@@ -7,9 +7,12 @@ import { COLORS } from '@/theme';
 import { getProject } from '@/services/projects';
 import { listReports } from '@/services/reports';
 import type { ProjectDetail, Report } from '@/types/domain';
+import { getRoleSlug } from '@/services/auth';
 
 export default function TaskDetailScreen() {
   const { projectId, taskId } = useLocalSearchParams();
+  const roleSlug = getRoleSlug();
+  const isProjectLeadRole = roleSlug === 'responsable_proyecto';
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -139,7 +142,11 @@ export default function TaskDetailScreen() {
           {reports.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No hay reportes para esta tarea</Text>
-              <Text style={styles.emptySubtext}>Crea un reporte para registrar el avance de esta tarea</Text>
+              <Text style={styles.emptySubtext}>
+                {isProjectLeadRole
+                  ? 'Registra una incidencia para documentar esta tarea.'
+                  : 'Crea un reporte para registrar el avance de esta tarea'}
+              </Text>
             </View>
           ) : (
             reports.map(report => (
@@ -169,13 +176,22 @@ export default function TaskDetailScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.createReportButton}
-          onPress={() => router.push({
-            pathname: '/create-report',
-            params: { projectId: String(projectId), taskId: String(taskId) }
-          })}
+          onPress={() => {
+            if (!projectId || !taskId) return;
+            const params: Record<string, string> = {
+              projectId: String(projectId),
+              taskId: String(taskId),
+            };
+            if (isProjectLeadRole) {
+              params.sendAsIncident = 'true';
+            }
+            router.push({ pathname: '/create-report', params });
+          }}
         >
           <Plus size={20} color="#FFFFFF" />
-          <Text style={styles.createReportButtonText}>Crear Reporte de Avance</Text>
+          <Text style={styles.createReportButtonText}>
+            {isProjectLeadRole ? 'Reportar Incidencia' : 'Crear Reporte de Avance'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

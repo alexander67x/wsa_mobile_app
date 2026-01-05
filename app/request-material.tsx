@@ -12,10 +12,9 @@ import type { CatalogItem } from '@/types/domain';
 
 let materialsStatic: CatalogItem[] = [];
 
-const priorities = [
-  { key: 'low', label: 'Baja', color: '#10B981' },
-  { key: 'medium', label: 'Media', color: '#F59E0B' },
-  { key: 'high', label: 'Alta', color: '#EF4444' },
+const urgencyOptions = [
+  { key: 'normal', label: 'Solicitud normal', color: '#10B981', urgent: false },
+  { key: 'urgent', label: 'Urgente', color: '#EF4444', urgent: true },
 ];
 
 interface MaterialRequest {
@@ -33,7 +32,8 @@ export default function RequestMaterialScreen() {
   const [selectedMaterial, setSelectedMaterial] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [deliveryDate, setDeliveryDate] = useState('');
-  const [priority, setPriority] = useState('medium');
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [reason, setReason] = useState('');
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showIosDatePicker, setShowIosDatePicker] = useState(false);
@@ -177,6 +177,7 @@ export default function RequestMaterialScreen() {
         qty: item.quantity,
       };
     });
+    const reasonValue = reason.trim();
     const observationsValue = observations.trim();
 
     setIsSubmitting(true);
@@ -185,8 +186,9 @@ export default function RequestMaterialScreen() {
         projectId: selectedProject,
         items: itemsPayload,
         deliveryDate,
-        priority: priority as 'low' | 'medium' | 'high',
-        observations: observationsValue ? observationsValue : undefined,
+        reason: reasonValue,
+        urgent: isUrgent,
+        observations: observationsValue,
       });
 
       Alert.alert(
@@ -264,21 +266,39 @@ export default function RequestMaterialScreen() {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Prioridad <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>Urgencia <Text style={styles.required}>*</Text></Text>
             <View style={styles.typeContainer}>
-              {priorities.map(prio => (
-                <TouchableOpacity
-                  key={prio.key}
-                  style={[styles.typeOption, { borderColor: prio.color }, priority === prio.key && { backgroundColor: prio.color + '20' }]}
-                  onPress={() => setPriority(prio.key)}
-                >
-                  <View style={[styles.typeIndicator, { backgroundColor: prio.color }]} />
-                  <Text style={[styles.typeText, { color: priority === prio.key ? prio.color : '#6B7280' }]}>
-                    {prio.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {urgencyOptions.map(option => {
+                const active = isUrgent === option.urgent;
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.typeOption,
+                      { borderColor: option.color },
+                      active && { backgroundColor: `${option.color}20` },
+                    ]}
+                    onPress={() => setIsUrgent(option.urgent)}
+                  >
+                    <View style={[styles.typeIndicator, { backgroundColor: option.color }]} />
+                    <Text style={[styles.typeText, { color: active ? option.color : '#6B7280' }]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Motivo</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Describe brevemente el motivo"
+              value={reason}
+              onChangeText={setReason}
+              placeholderTextColor="#9CA3AF"
+            />
           </View>
         </View>
 

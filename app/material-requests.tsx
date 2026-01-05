@@ -111,23 +111,8 @@ export default function MaterialsScreen() {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return '#EF4444';
-      case 'medium': return '#F59E0B';
-      case 'low': return '#6B7280';
-      default: return '#6B7280';
-    }
-  };
-
-  const getPriorityText = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'Alta';
-      case 'medium': return 'Media';
-      case 'low': return 'Baja';
-      default: return 'Normal';
-    }
-  };
+  const getUrgencyColor = (urgent: boolean) => (urgent ? '#EF4444' : '#6B7280');
+  const getUrgencyText = (urgent: boolean) => (urgent ? 'Urgente' : 'Normal');
 
   const renderProgress = (progress?: number | null, approved?: number, delivered?: number) => {
     if (progress === null || progress === undefined) {
@@ -241,12 +226,13 @@ export default function MaterialsScreen() {
                 <View style={styles.quantityInfo}>
                   <Package size={16} color="#6B7280" />
                   <Text style={styles.quantityText}>
-                    {(request.quantity ?? request.totalApprovedQuantity ?? 0)} {request.unit || 'unidades'}
+                    {(request.quantity ?? request.totalApprovedQuantity ?? request.totalDeliveredQuantity ?? 0)}{' '}
+                    {request.unit || 'unidades'}
                   </Text>
                 </View>
-                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(request.priority) + '20' }]}>
-                  <Text style={[styles.priorityText, { color: getPriorityColor(request.priority) }]}>
-                    {getPriorityText(request.priority)}
+                <View style={[styles.urgencyBadge, { backgroundColor: `${getUrgencyColor(request.urgent)}20` }]}>
+                  <Text style={[styles.urgencyText, { color: getUrgencyColor(request.urgent) }]}>
+                    {getUrgencyText(request.urgent)}
                   </Text>
                 </View>
               </View>
@@ -411,12 +397,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: '#374151',
   },
-  priorityBadge: {
+  urgencyBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
   },
-  priorityText: {
+  urgencyText: {
     fontSize: 12,
     fontWeight: '600',
   },

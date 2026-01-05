@@ -1,7 +1,5 @@
-import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 import type { KanbanBoard, KanbanCard } from '@/types/domain';
-import * as mock from '@/mocks/kanban';
 import type { Id } from '@/types/domain';
 
 interface ApiKanbanCard {
@@ -16,8 +14,6 @@ interface ApiKanbanCard {
 }
 
 export async function getBoard(projectId?: string): Promise<KanbanBoard> {
-  if (USE_MOCKS) return Promise.resolve(mock.board);
-  
   const params = projectId ? `?projectId=${projectId}` : '';
   const apiBoard = await fetchJson<Record<string, ApiKanbanCard[]>>(`/kanban${params}`);
   
@@ -26,10 +22,6 @@ export async function getBoard(projectId?: string): Promise<KanbanBoard> {
 }
 
 export async function addColumn(name: string): Promise<void> {
-  if (USE_MOCKS) {
-    if (!mock.board[name]) mock.board[name] = [];
-    return;
-  }
   await fetchJson<void, { name: string }>('/kanban/columns', { method: 'POST', body: { name } });
 }
 
@@ -39,12 +31,6 @@ export async function addCard(
   projectId?: string, 
   taskId?: string
 ): Promise<KanbanCard> {
-  if (USE_MOCKS) {
-    if (!mock.board[column]) mock.board[column] = [];
-    mock.board[column].unshift(card);
-    return card;
-  }
-  
   // API requires projectId and taskId
   if (!projectId || !taskId) {
     throw new Error('projectId y taskId son requeridos para crear una tarjeta');
@@ -87,14 +73,6 @@ export async function addCard(
 }
 
 export async function getCard(cardId: Id): Promise<KanbanCard | null> {
-  if (USE_MOCKS) {
-    for (const col of Object.values(mock.board)) {
-      const found = col.find(c => c.id === cardId);
-      if (found) return found;
-    }
-    return null;
-  }
-  
   const apiCard = await fetchJson<ApiKanbanCard>(`/kanban/cards/${cardId}`);
   
   return {

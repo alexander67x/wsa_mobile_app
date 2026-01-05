@@ -20,30 +20,59 @@ export default function ReportDetailScreen() {
     );
   }
 
+  const normalizeStatus = (status: string) => (typeof status === 'string' ? status.toLowerCase() : '');
+
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return '#10B981';
-      case 'pending': return '#F59E0B';
-      case 'rejected': return '#EF4444';
-      default: return '#6B7280';
+    switch (normalizeStatus(status)) {
+      case 'approved':
+      case 'aprobado':
+      case 'aprobada':
+        return '#10B981';
+      case 'pending':
+      case 'pendiente':
+        return '#F59E0B';
+      case 'rejected':
+      case 'rechazado':
+      case 'rechazada':
+        return '#EF4444';
+      default:
+        return '#6B7280';
     }
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved': return <CheckCircle size={20} color="#10B981" />;
-      case 'pending': return <Clock size={20} color="#F59E0B" />;
-      case 'rejected': return <AlertTriangle size={20} color="#EF4444" />;
-      default: return <Clock size={20} color="#6B7280" />;
+    switch (normalizeStatus(status)) {
+      case 'approved':
+      case 'aprobado':
+      case 'aprobada':
+        return <CheckCircle size={20} color="#10B981" />;
+      case 'pending':
+      case 'pendiente':
+        return <Clock size={20} color="#F59E0B" />;
+      case 'rejected':
+      case 'rechazado':
+      case 'rechazada':
+        return <AlertTriangle size={20} color="#EF4444" />;
+      default:
+        return <Clock size={20} color="#6B7280" />;
     }
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'approved': return 'Aprobado';
-      case 'pending': return 'Pendiente';
-      case 'rejected': return 'Rechazado';
-      default: return 'Desconocido';
+    switch (normalizeStatus(status)) {
+      case 'approved':
+      case 'aprobado':
+      case 'aprobada':
+        return 'Aprobado';
+      case 'pending':
+      case 'pendiente':
+        return 'Pendiente';
+      case 'rejected':
+      case 'rechazado':
+      case 'rechazada':
+        return 'Rechazado';
+      default:
+        return 'Desconocido';
     }
   };
 
@@ -56,16 +85,22 @@ export default function ReportDetailScreen() {
     }
   };
 
-  const isApproved = data.status === 'approved';
-  const isRejected = data.status === 'rejected';
-  const reviewer = isApproved ? data.approvedBy : data.rejectedBy;
-  const reviewDate = isApproved ? data.approvedDate : data.rejectedDate;
+  const statusNormalized = normalizeStatus(data.status);
+  const isApproved = ['approved', 'aprobado', 'aprobada'].includes(statusNormalized);
+  const isRejected = ['rejected', 'rechazado', 'rechazada'].includes(statusNormalized);
+  const reviewer =
+    (isApproved ? data.approvedBy : data.rejectedBy) ??
+    data.approvedBy ??
+    data.rejectedBy;
+  const reviewDate =
+    (isApproved ? data.approvedDate : data.rejectedDate) ??
+    data.approvedDate ??
+    data.rejectedDate;
   const reviewTitle = isApproved ? 'Aprobacion' : 'Rechazo';
   const reviewIcon = isApproved ? <CheckCircle size={20} color="#166534" /> : <AlertTriangle size={20} color="#991B1B" />;
   const reviewLabelColor = isApproved ? '#166534' : '#991B1B';
   const reviewCardStyle = isApproved ? styles.approvalCard : styles.rejectionCard;
   const reviewBorderColor = isApproved ? '#10B981' : '#EF4444';
-  const observationsText = data.observations || 'Sin observaciones registradas';
   const feedbackText = data.feedback || 'Sin comentarios';
   const hasImages = (data.images?.length ?? 0) > 0;
 
@@ -131,11 +166,6 @@ export default function ReportDetailScreen() {
         <View style={styles.descriptionCard}>
           <Text style={styles.cardTitle}>Descripción</Text>
           <Text style={styles.descriptionText}>{data.description}</Text>
-        </View>
-
-        <View style={styles.observationsCard}>
-          <Text style={styles.cardTitle}>Observaciones</Text>
-          <Text style={styles.observationsText}>{observationsText}</Text>
         </View>
 
         <View style={styles.imagesCard}>
@@ -208,10 +238,8 @@ const styles = StyleSheet.create({
   progressBar: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4 },
   progressFill: { height: '100%', borderRadius: 4 },
   descriptionCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
-  observationsCard: { backgroundColor: '#FFFBEB', borderRadius: 16, padding: 20, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#F59E0B' },
   cardTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937', marginBottom: 12 },
   descriptionText: { fontSize: 16, color: '#374151', lineHeight: 24 },
-  observationsText: { fontSize: 16, color: '#92400E', lineHeight: 24 },
   imagesCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   imagesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

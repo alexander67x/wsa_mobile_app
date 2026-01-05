@@ -1,15 +1,12 @@
-import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 import {
   CatalogItem,
   MaterialDelivery,
-  MaterialPriority,
   MaterialRequest,
   MaterialRequestDetail,
   MaterialRequestItem,
   MaterialRequestStatus,
 } from '@/types/domain';
-import { materialCatalog, materialRequests } from '@/mocks/materials';
 import { getMyProjects } from '@/services/projects';
 
 interface ApiCatalogItem {
@@ -31,6 +28,7 @@ interface ApiMaterialRequest {
   code?: MaybeString;
   codigo?: MaybeString;
   numeroSolicitud?: MaybeString;
+  reason?: MaybeString;
   projectId?: MaybeNumber;
   proyectoId?: MaybeNumber;
   projectName?: MaybeString;
@@ -136,12 +134,17 @@ const coerceNumber = (value: MaybeNumber): number | undefined => {
   return Number.isFinite(num) ? num : undefined;
 };
 
-const mapPriority = (priority?: MaybeString): MaterialPriority => {
+const isUrgentPriorityValue = (priority?: MaybeString): boolean => {
   const normalized = normalizeString(priority)?.toLowerCase();
-  if (normalized === 'high' || normalized === 'alta') return 'high';
-  if (normalized === 'low' || normalized === 'baja') return 'low';
-  if (normalized === 'medium' || normalized === 'media') return 'medium';
-  return 'medium';
+  if (!normalized) return false;
+  return normalized === 'high' || normalized === 'alta' || normalized === 'urgente' || normalized === 'urgent';
+};
+
+const resolveUrgentFlag = (request: ApiMaterialRequest): boolean => {
+  if (typeof request.urgente === 'boolean') {
+    return request.urgente;
+  }
+  return isUrgentPriorityValue(request.priority ?? request.prioridad);
 };
 
 const mapStatus = (status?: MaybeString): MaterialRequestStatus => {
@@ -209,6 +212,50 @@ const mapMaterialRequestItem = (item: ApiMaterialRequestItem): MaterialRequestIt
   const lotRaw = item.lote;
   const lot = lotRaw && typeof lotRaw === 'object' ? lotRaw : undefined;
   const deliveries = item.deliveries?.map(mapMaterialDelivery) ?? [];
+
+  const resolveMaterialName = (): string => {
+    const directName = normalizeString(item.materialName);
+    if (directName) return directName;
+    if (typeof item.material === 'string') {
+      const plain = normalizeString(item.material);
+      if (plain) return plain;
+    }
+    if (material) {
+      const objectName = normalizeString(
+        (material as { name?: string; nombre?: string }).name ??
+        (material as { name?: string; nombre?: string }).nombre
+      );
+      if (objectName) return objectName;
+    }
+    return '';
+  };
+
+  const resolveUnitValue = (value: unknown): string | undefined => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'string') {
+      return normalizeString(value);
+    }
+    if (typeof value === 'object') {
+      const candidate = normalizeString(
+        (value as { name?: string; nombre?: string; unit?: string; unidad?: string; unidad_medida?: string }).name ??
+        (value as { name?: string; nombre?: string; unit?: string; unidad?: string; unidad_medida?: string }).nombre ??
+        (value as { name?: string; nombre?: string; unit?: string; unidad?: string; unidad_medida?: string }).unit ??
+        (value as { name?: string; nombre?: string; unit?: string; unidad?: string; unidad_medida?: string }).unidad ??
+        (value as { name?: string; nombre?: string; unit?: string; unidad?: string; unidad_medida?: string }).unidad_medida
+      );
+      if (candidate) return candidate;
+    }
+    return undefined;
+  };
+
+  const resolvedUnit =
+    resolveUnitValue(item.unit) ??
+    resolveUnitValue(item.unidad) ??
+    resolveUnitValue(material?.unit) ??
+    resolveUnitValue(material?.unidad) ??
+    resolveUnitValue((material as any)?.unidad_medida) ??
+    resolveUnitValue((material as any)?.unidadMedida);
+
   const requestedQty = coerceNumber(item.requestedQty ?? item.cantidadSolicitada) ?? 0;
   const approvedQty = coerceNumber(item.approvedQty ?? item.cantidadAprobada) ?? requestedQty;
   const deliveredQty = coerceNumber(item.deliveredQty ?? item.cantidadEntregada) ?? 0;
@@ -216,16 +263,8 @@ const mapMaterialRequestItem = (item: ApiMaterialRequestItem): MaterialRequestIt
   return {
     id: normalizeId(item.id),
     materialId: normalizeId(item.materialId ?? item.material_id ?? material?.id) || undefined,
-    materialName:
-      normalizeString(item.materialName) ??
-      (typeof item.material === 'string'
-        ? normalizeString(item.material) ?? ''
-        : normalizeString(material?.name) ?? '') ??
-      '',
-    unit:
-      normalizeString(item.unit)
-      ?? normalizeString(item.unidad)
-      ?? normalizeString(material?.unidad),
+    materialName: resolveMaterialName(),
+    unit: resolvedUnit ?? undefined,
     requestedQty,
     approvedQty,
     deliveredQty,
@@ -250,24 +289,48 @@ const mapMaterialRequest = (request: ApiMaterialRequest): MaterialRequest => {
   const project = request.proyecto && typeof request.proyecto === 'object' ? request.proyecto : undefined;
   const items = request.items?.map(mapMaterialRequestItem) ?? [];
   const firstItem = items[0];
+
+  const aggregatedRequested = items.length
+    ? items.reduce((sum, item) => sum + (item.requestedQty ?? 0), 0)
+    : undefined;
+  const aggregatedApproved = items.length
+    ? items.reduce((sum, item) => sum + (item.approvedQty ?? item.requestedQty ?? 0), 0)
+    : undefined;
+  const aggregatedDelivered = items.length
+    ? items.reduce((sum, item) => sum + (item.deliveredQty ?? 0), 0)
+    : undefined;
+
   const totalApproved =
-    request.totalApprovedQuantity ?? request.cantidadAprobadaTotal ?? firstItem?.approvedQty ?? 0;
+    coerceNumber(request.totalApprovedQuantity ?? request.cantidadAprobadaTotal) ??
+    (aggregatedApproved !== undefined ? aggregatedApproved : undefined);
   const totalDelivered =
-    request.totalDeliveredQuantity ?? request.cantidadEntregadaTotal ?? firstItem?.deliveredQty ?? 0;
-  const quantity = request.quantity ?? request.cantidad ?? firstItem?.approvedQty ?? firstItem?.requestedQty;
+    coerceNumber(request.totalDeliveredQuantity ?? request.cantidadEntregadaTotal) ??
+    (aggregatedDelivered !== undefined ? aggregatedDelivered : undefined);
+  const quantity =
+    coerceNumber(request.quantity ?? request.cantidad) ??
+    (aggregatedRequested !== undefined ? aggregatedRequested : undefined) ??
+    (aggregatedApproved !== undefined ? aggregatedApproved : undefined);
 
   const deliveryProgressExplicit =
     request.deliveryProgress ??
     request.avanceEntrega ??
     request.delivery_percentage ??
     request.porcentajeEntregado;
+  const hasTotalApproved = typeof totalApproved === 'number' && totalApproved > 0;
+  const hasQuantity = typeof quantity === 'number' && quantity > 0;
+  const hasTotalDelivered = typeof totalDelivered === 'number' && totalDelivered >= 0;
+  const safeTotalDelivered = typeof totalDelivered === 'number' ? totalDelivered : 0;
+
+  const totalApprovedValue = hasTotalApproved ? (totalApproved as number) : undefined;
+  const quantityValue = hasQuantity ? (quantity as number) : undefined;
+
   const deliveryProgress =
     typeof deliveryProgressExplicit === 'number'
       ? deliveryProgressExplicit
-      : totalApproved
-        ? Math.min(100, Math.round((totalDelivered / totalApproved) * 100))
-        : totalDelivered && quantity
-          ? Math.min(100, Math.round((totalDelivered / quantity) * 100))
+      : totalApprovedValue !== undefined && hasTotalDelivered
+        ? Math.min(100, Math.round((safeTotalDelivered / totalApprovedValue) * 100))
+        : quantityValue !== undefined && hasTotalDelivered
+          ? Math.min(100, Math.round((safeTotalDelivered / quantityValue) * 100))
           : 0;
 
   const projectName =
@@ -309,7 +372,10 @@ const mapMaterialRequest = (request: ApiMaterialRequest): MaterialRequest => {
       normalizeString(request.statusLabel) ??
       normalizeString(request.estadoLabel) ??
       normalizeString(request.estado_label),
-    priority: mapPriority(request.priority ?? request.prioridad),
+    urgent: resolveUrgentFlag(request),
+    reason:
+      normalizeString(request.reason) ??
+      normalizeString(request.motivo),
     observations:
       normalizeString(request.observations) ??
       normalizeString(request.observaciones),
@@ -320,12 +386,28 @@ const mapMaterialRequest = (request: ApiMaterialRequest): MaterialRequest => {
       request.items_count ??
       request.itemsCount ??
       (items.length ? items.length : undefined),
-    totalApprovedQuantity: totalApproved || undefined,
-    totalDeliveredQuantity: totalDelivered || undefined,
+    totalApprovedQuantity: totalApproved,
+    totalDeliveredQuantity: totalDelivered,
     materialName:
-      normalizeString(request.materialName ?? request.material) ?? firstItem?.materialName,
+      normalizeString(request.materialName) ??
+      (typeof request.material === 'string'
+        ? normalizeString(request.material)
+        : normalizeString(
+            (request.material as { name?: string; nombre?: string } | undefined)?.name ??
+            (request.material as { name?: string; nombre?: string } | undefined)?.nombre
+          )) ??
+      firstItem?.materialName,
     quantity: quantity ?? undefined,
-    unit: normalizeString(request.unit ?? request.unidad) ?? firstItem?.unit,
+    unit:
+      normalizeString(request.unit ?? request.unidad) ??
+      (typeof request.material === 'object'
+        ? normalizeString(
+            (request.material as { unit?: string; unidad?: string; unidad_medida?: string }).unit ??
+            (request.material as { unit?: string; unidad?: string; unidad_medida?: string }).unidad ??
+            (request.material as { unit?: string; unidad?: string; unidad_medida?: string }).unidad_medida
+          )
+        : undefined) ??
+      firstItem?.unit,
   };
 };
 
@@ -352,8 +434,6 @@ export interface ListMaterialRequestsParams {
 }
 
 export async function listMaterialRequests(params: ListMaterialRequestsParams = {}): Promise<MaterialRequest[]> {
-  if (USE_MOCKS) return Promise.resolve(materialRequests);
-
   const query = new URLSearchParams();
   if (params.projectId) query.append('projectId', params.projectId);
   if (params.status) query.append('status', params.status);
@@ -385,20 +465,6 @@ export async function listMaterialRequests(params: ListMaterialRequestsParams = 
 }
 
 export async function getMaterialRequest(id: string): Promise<MaterialRequestDetail> {
-  if (USE_MOCKS) {
-    const mock = materialRequests.find(r => r.id === id);
-    return Promise.resolve({
-      ...(mock ?? materialRequests[0]),
-      id: mock?.id ?? id,
-      items: [],
-      deliveries: [],
-      status: mock?.status ?? 'pending',
-      priority: mock?.priority ?? 'medium',
-      projectName: mock?.projectName ?? 'Proyecto demo',
-      requestDate: mock?.requestDate ?? '2024-01-01',
-    } as MaterialRequestDetail);
-  }
-
   const apiRequest = await fetchJson<ApiMaterialRequest>(`/materials/requests/${id}`);
   return mapMaterialRequestDetail(apiRequest);
 }
@@ -412,8 +478,6 @@ export async function approveMaterialRequest(
   id: string,
   payload: ApproveMaterialRequestPayload = {}
 ): Promise<MaterialRequestDetail> {
-  if (USE_MOCKS) return getMaterialRequest(id);
-
   const body: Record<string, unknown> = {};
   if (payload.observations) body.observations = payload.observations;
   if (payload.items?.length) {
@@ -439,8 +503,6 @@ export async function rejectMaterialRequest(
   id: string,
   payload: RejectMaterialRequestPayload
 ): Promise<MaterialRequestDetail> {
-  if (USE_MOCKS) return getMaterialRequest(id);
-
   const apiRequest = await fetchJson<ApiMaterialRequest, RejectMaterialRequestPayload>(
     `/materials/requests/${id}/reject`,
     { method: 'POST', body: payload }
@@ -470,8 +532,6 @@ export async function deliverMaterialRequest(
   id: string,
   payload: DeliverMaterialRequestInput
 ): Promise<MaterialRequestDetail> {
-  if (USE_MOCKS) return getMaterialRequest(id);
-
   const apiRequest = await fetchJson<ApiMaterialRequest, DeliverMaterialRequestInput>(
     `/materials/requests/${id}/deliver`,
     { method: 'POST', body: payload }
@@ -481,8 +541,6 @@ export async function deliverMaterialRequest(
 }
 
 export async function listCatalog(projectId?: string): Promise<CatalogItem[]> {
-  if (USE_MOCKS) return Promise.resolve(materialCatalog);
-
   // Build URL with projectId as query parameter if provided
   let url = '/materials/catalog';
   if (projectId) {
@@ -509,7 +567,8 @@ export interface CreateMaterialRequestInput {
     materialId: string | number;
     qty: number;
   }>;
-  priority?: MaterialPriority;
+  urgent?: boolean;
+  reason?: string;
   deliveryDate?: string;
   observations?: string;
 }
@@ -522,18 +581,15 @@ type CreateMaterialRequestApiBody = CreateMaterialRequestInput & {
 export async function createMaterialRequest(
   payload: CreateMaterialRequestInput
 ): Promise<{ id: string }> {
-  if (USE_MOCKS) return Promise.resolve({ id: 'mock' });
-
   const requestBody: CreateMaterialRequestApiBody = {
     projectId: payload.projectId,
     items: payload.items,
   };
 
-  if (payload.priority) {
-    requestBody.priority = payload.priority;
-  }
-  if (payload.observations) {
-    requestBody.observations = payload.observations;
+  requestBody.urgent = Boolean(payload.urgent);
+  requestBody.observations = payload.observations ?? '';
+  if (payload.reason !== undefined) {
+    requestBody.reason = payload.reason;
   }
   if (payload.deliveryDate) {
     requestBody.deliveryDate = payload.deliveryDate;
@@ -541,7 +597,7 @@ export async function createMaterialRequest(
     requestBody.fechaRequerida = payload.deliveryDate;
   }
 
-  const response = await fetchJson<{ id: string }, typeof payload>(
+  const response = await fetchJson<{ id: string }, CreateMaterialRequestApiBody>(
     '/materials/requests',
     { method: 'POST', body: requestBody }
   );

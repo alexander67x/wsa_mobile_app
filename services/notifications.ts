@@ -2,7 +2,6 @@ import { Alert, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 
-import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 
 let lastRegisteredExpoToken: string | null = null;
@@ -43,8 +42,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 }
 
 export async function registerDevicePushToken(): Promise<void> {
-  if (USE_MOCKS) return;
-
   try {
     const expoToken = await registerForPushNotificationsAsync();
     if (!expoToken || expoToken === lastRegisteredExpoToken) return;
@@ -58,4 +55,3 @@ export async function registerDevicePushToken(): Promise<void> {
     console.warn('[notifications] No se pudo registrar el token push', error);
   }
 }
-

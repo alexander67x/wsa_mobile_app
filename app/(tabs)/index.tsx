@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Search, MapPin, Calendar, ChartBar as BarChart3, Plus } from 'lucide-react-native';
-import { getMyProjects } from '@/services/projects';
+import { getMyProjects, getProject } from '@/services/projects';
+import { listReports } from '@/services/reports';
 import type { Project } from '@/types/domain';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
@@ -17,7 +18,39 @@ export default function HomeScreen() {
   const loadProjects = async () => {
     try {
       const projectList = await getMyProjects();
-      setProjects(projectList);
+      const enrichedProjects = await Promise.all(
+        projectList.map(async (project) => {
+          try {
+            const [detail, projectReports] = await Promise.all([
+              getProject(project.id),
+              listReports(project.id),
+            ]);
+
+            const tasks = detail.tasks || [];
+            const completedTasks = tasks.filter(task => task.status === 'completed').length;
+            const derivedProgress = tasks.length ? Math.round((completedTasks / tasks.length) * 100) : undefined;
+            const normalizedProgress = Number(detail.progress);
+            const resolvedProgress = Number.isFinite(normalizedProgress)
+              ? normalizedProgress
+              : derivedProgress ?? project.progress ?? 0;
+
+            return {
+              ...project,
+              progress: resolvedProgress,
+              tasksCount: tasks.length || project.tasksCount || 0,
+              reportsCount: projectReports.length || project.reportsCount || 0,
+            };
+          } catch (error) {
+            console.warn('Error loading project detail:', error);
+            return {
+              ...project,
+              tasksCount: project.tasksCount ?? 0,
+              reportsCount: project.reportsCount ?? 0,
+            };
+          }
+        })
+      );
+      setProjects(enrichedProjects);
     } catch (error) {
       console.error('Error loading projects:', error);
       setProjects([]);
@@ -137,7 +170,15 @@ export default function HomeScreen() {
             </Text>
           </View>
         ) : (
-          filteredProjects.map(project => (
+          filteredProjects.map(project => {
+            const progressValue = Number.isFinite(project.progress) ? Math.round(project.progress) : 0;
+            const tasksCount = project.tasksCount ?? 0;
+            const reportsCount = project.reportsCount ?? 0;
+            const dueDateLabel =
+              project.dueDate && !Number.isNaN(new Date(project.dueDate).getTime())
+                ? new Date(project.dueDate).toLocaleDateString('es-ES')
+                : 'Sin fecha';
+            return (
           <TouchableOpacity
             key={project.id}
             style={styles.projectCard}
@@ -161,13 +202,13 @@ export default function HomeScreen() {
             <View style={styles.progressContainer}>
               <View style={styles.progressHeader}>
                 <Text style={styles.progressLabel}>Progreso</Text>
-                <Text style={styles.progressPercentage}>{project.progress}%</Text>
+                <Text style={styles.progressPercentage}>{progressValue}%</Text>
               </View>
               <View style={styles.progressBar}>
                 <View
                   style={[
                     styles.progressFill,
-                    { width: `${project.progress}%`, backgroundColor: getStatusColor(project.status) }
+                    { width: `${progressValue}%`, backgroundColor: getStatusColor(project.status) }
                   ]}
                 />
               </View>
@@ -175,19 +216,20 @@ export default function HomeScreen() {
             <View style={styles.projectStats}>
               <View style={styles.statItem}>
                 <Calendar size={16} color="#6B7280" />
-                <Text style={styles.statText}>Vence: {project.dueDate || 'Sin fecha'}</Text>
+                <Text style={styles.statText}>Vence: {dueDateLabel}</Text>
               </View>
               <View style={styles.statItem}>
                 <BarChart3 size={16} color="#6B7280" />
-                <Text style={styles.statText}>{project.tasksCount} tareas</Text>
+                <Text style={styles.statText}>{tasksCount} tareas</Text>
               </View>
               <View style={styles.statItem}>
                 <Plus size={16} color="#6B7280" />
-                <Text style={styles.statText}>{project.reportsCount} reportes</Text>
+                <Text style={styles.statText}>{reportsCount} reportes</Text>
               </View>
             </View>
           </TouchableOpacity>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </View>

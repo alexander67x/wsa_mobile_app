@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { ArrowLeft, FileText, AlertTriangle, CheckCircle } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { getMyProjects } from '@/services/projects';
 import type { Project } from '@/types/domain';
 import { COLORS } from '@/theme';
+import { getRoleSlug } from '@/services/auth';
 
 export default function SelectProjectTypeScreen() {
+  const roleSlug = getRoleSlug();
+  const isProjectLeadRole = roleSlug === 'responsable_proyecto';
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<'report' | 'incident' | null>(null);
+  const [selectedType, setSelectedType] = useState<'report' | 'incident' | null>(isProjectLeadRole ? 'incident' : null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -155,29 +158,31 @@ export default function SelectProjectTypeScreen() {
                 </Text>
 
                 <View style={styles.typeContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.typeCard,
-                      selectedType === 'report' && styles.typeCardSelected
-                    ]}
-                    onPress={() => setSelectedType('report')}
-                  >
-                    <View style={[
-                      styles.typeIconContainer,
-                      selectedType === 'report' && styles.typeIconContainerSelected
-                    ]}>
-                      <FileText size={32} color={selectedType === 'report' ? '#FFFFFF' : COLORS.primary} />
-                    </View>
-                    <Text style={[
-                      styles.typeTitle,
-                      selectedType === 'report' && styles.typeTitleSelected
-                    ]}>
-                      Reporte de Avance
-                    </Text>
-                    <Text style={styles.typeDescription}>
-                      Documenta el progreso del trabajo, materiales utilizados y observaciones
-                    </Text>
-                  </TouchableOpacity>
+                  {!isProjectLeadRole && (
+                    <TouchableOpacity
+                      style={[
+                        styles.typeCard,
+                        selectedType === 'report' && styles.typeCardSelected
+                      ]}
+                      onPress={() => setSelectedType('report')}
+                    >
+                      <View style={[
+                        styles.typeIconContainer,
+                        selectedType === 'report' && styles.typeIconContainerSelected
+                      ]}>
+                        <FileText size={32} color={selectedType === 'report' ? '#FFFFFF' : COLORS.primary} />
+                      </View>
+                      <Text style={[
+                        styles.typeTitle,
+                        selectedType === 'report' && styles.typeTitleSelected
+                      ]}>
+                        Reporte de Avance
+                      </Text>
+                      <Text style={styles.typeDescription}>
+                        Documenta el progreso del trabajo, materiales utilizados y observaciones
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
                   <TouchableOpacity
                     style={[
@@ -204,6 +209,7 @@ export default function SelectProjectTypeScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
+
               </View>
             )}
 

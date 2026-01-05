@@ -30,7 +30,6 @@ interface ProfileData {
   company?: string;
   location?: string;
   department?: string;
-  privileges?: string;
   joinDate?: string;
   active?: boolean;
   employeeId?: string;
@@ -60,6 +59,7 @@ function mapProfileData(me: any, authUser: any, permissions: string[]): ProfileD
     employee?.cargo ||
     employee?.puesto ||
     authUser?.role ||
+    (permissions?.length ? permissions[0] : '') ||
     '';
 
   const department =
@@ -70,18 +70,6 @@ function mapProfileData(me: any, authUser: any, permissions: string[]): ProfileD
     employee?.department ||
     '';
 
-  const privilegeSource =
-    (Array.isArray(me?.privilegios) && me?.privilegios) ||
-    (Array.isArray(me?.privileges) && me?.privileges) ||
-    (Array.isArray(employee?.privilegios) && employee?.privilegios) ||
-    (Array.isArray(employee?.privileges) && employee?.privileges) ||
-    permissions;
-
-  const privileges =
-    Array.isArray(privilegeSource) ? privilegeSource.join(', ') :
-    typeof privilegeSource === 'string' ? privilegeSource :
-    '';
-
   return {
     name: me?.name || me?.nombre || employee?.name || employee?.nombre || authUser?.name || '',
     role,
@@ -90,7 +78,6 @@ function mapProfileData(me: any, authUser: any, permissions: string[]): ProfileD
     company: me?.empresa || me?.company || employee?.empresa || employee?.company || '',
     location: me?.ubicacion || me?.location || employee?.ubicacion || employee?.location || employee?.city || '',
     department,
-    privileges,
     joinDate: me?.fecha_ingreso || me?.fechaIngreso || employee?.fecha_ingreso || employee?.fechaIngreso || '',
     active: me?.activo ?? me?.active ?? employee?.activo ?? employee?.active ?? undefined,
     employeeId: authUser?.employeeId || me?.employeeId || employee?.cod_empleado || employee?.codEmpleado || employee?.id || '',
@@ -451,18 +438,16 @@ export default function ProfileScreen() {
               </View>
             )}
 
-            {(profile?.privileges || profile?.employeeId) && (
-              <View style={styles.infoItem}>
-                <Shield size={20} color={COLORS.mutedText} />
-                <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>Privilegios</Text>
-                  <Text style={styles.infoValue}>
-                    {profile?.privileges || 'Sin privilegios'}
-                    {profile?.employeeId ? ` • ID: ${profile.employeeId}` : ''}
-                  </Text>
-                </View>
+            <View style={styles.infoItem}>
+              <Shield size={20} color={COLORS.mutedText} />
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoLabel}>Rol</Text>
+                <Text style={styles.infoValue}>
+                  {profile?.role || 'Sin rol asignado'}
+                  {profile?.employeeId ? ` • ID: ${profile.employeeId}` : ''}
+                </Text>
               </View>
-            )}
+            </View>
 
             {!!formattedJoinDate && (
               <View style={styles.infoItem}>

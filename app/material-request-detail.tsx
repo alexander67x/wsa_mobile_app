@@ -38,12 +38,6 @@ const STATUS_COLORS: Record<string, string> = {
     rejected: '#EF4444',
 };
 
-const PRIORITY_COLORS: Record<string, string> = {
-    high: '#EF4444',
-    medium: '#F59E0B',
-    low: '#6B7280',
-};
-
 type DeliveryInput = {
     quantity: string;
     lotNumber: string;
@@ -354,8 +348,17 @@ export default function MaterialRequestDetailScreen() {
                                     {detail.statusLabel || detail.status}
                                 </Text>
                             </View>
-                            <View style={styles.priorityPill}>
-                                <Text style={[styles.priorityText, { color: PRIORITY_COLORS[detail.priority] ?? '#6B7280' }]}>Prioridad {detail.priority}</Text>
+                            <View
+                                style={[
+                                    styles.urgencyPill,
+                                    detail.urgent
+                                        ? { backgroundColor: 'rgba(239, 68, 68, 0.12)' }
+                                        : { backgroundColor: 'rgba(107, 114, 128, 0.12)' },
+                                ]}
+                            >
+                                <Text style={[styles.urgencyText, { color: detail.urgent ? '#EF4444' : '#6B7280' }]}>
+                                    {detail.urgent ? 'Urgente' : 'Solicitud normal'}
+                                </Text>
                             </View>
                         </View>
 
@@ -375,6 +378,13 @@ export default function MaterialRequestDetailScreen() {
                             ) : null}
                         </View>
 
+                        {detail.reason ? (
+                            <View style={styles.box}>
+                                <Text style={styles.boxLabel}>Motivo</Text>
+                                <Text style={styles.boxText}>{detail.reason}</Text>
+                            </View>
+                        ) : null}
+
                         {detail.observations ? (
                             <View style={styles.box}>
                                 <Text style={styles.boxLabel}>Observaciones</Text>
@@ -386,93 +396,30 @@ export default function MaterialRequestDetailScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Materiales solicitados</Text>
                         {detail.items.map(item => {
-                            const input = deliveryInputs[item.id] ?? { quantity: '', lotNumber: '', observations: '' };
                             const approved = item.approvedQty ?? item.requestedQty;
                             const delivered = item.deliveredQty ?? 0;
-                            const pending = Math.max(approved - delivered, 0);
-                            const pendingLabel = pending > 0 ? `${pending} ${item.unit || ''}`.trim() : 'Completo';
+                            const unitLabel = item.unit || 'Sin unidad';
 
                             return (
                                 <View key={item.id} style={styles.itemCard}>
                                     <View style={styles.itemHeader}>
                                         <Text style={styles.itemName}>{item.materialName}</Text>
-                                        <Text style={styles.itemUnit}>{item.unit}</Text>
+                                        <Text style={styles.itemUnit}>{unitLabel}</Text>
                                     </View>
                                     <View style={styles.itemStatsRow}>
-                                        <Text style={styles.itemStat}>Solicitado: {item.requestedQty}</Text>
-                                        <Text style={styles.itemStat}>Aprobado: {approved}</Text>
-                                        <Text style={styles.itemStat}>Entregado: {delivered}</Text>
-                                    </View>
-                                    <Text style={styles.pendingLabel}>Pendiente: {pendingLabel}</Text>
-
-                                    {detail.status === 'sent' ? (
-                                        <View style={styles.deliveryForm}>
-                                            <Text style={styles.deliveryFormLabel}>Registrar entrega</Text>
-                                            <View style={styles.deliveryInputsRow}>
-                                                <View style={styles.deliveryInputWrapper}>
-                                                    <Text style={styles.inputLabel}>Cantidad</Text>
-                                                    <TextInput
-                                                        style={styles.input}
-                                                        keyboardType="numeric"
-                                                        value={input.quantity}
-                                                        onChangeText={value =>
-                                                            setDeliveryInputs(state => ({
-                                                                ...state,
-                                                                [item.id]: {
-                                                                    ...state[item.id],
-                                                                    quantity: value,
-                                                                    lotNumber: state[item.id]?.lotNumber ?? '',
-                                                                    observations: state[item.id]?.observations ?? '',
-                                                                },
-                                                            }))
-                                                        }
-                                                        placeholder="0"
-                                                        placeholderTextColor="#9CA3AF"
-                                                    />
-                                                </View>
-                                                <View style={styles.deliveryInputWrapper}>
-                                                    <Text style={styles.inputLabel}>Lote (opcional)</Text>
-                                                    <TextInput
-                                                        style={styles.input}
-                                                        value={input.lotNumber}
-                                                        onChangeText={value =>
-                                                            setDeliveryInputs(state => ({
-                                                                ...state,
-                                                                [item.id]: {
-                                                                    ...state[item.id],
-                                                                    quantity: state[item.id]?.quantity ?? '',
-                                                                    lotNumber: value,
-                                                                    observations: state[item.id]?.observations ?? '',
-                                                                },
-                                                            }))
-                                                        }
-                                                        placeholder="Ej. LOTE-001"
-                                                        placeholderTextColor="#9CA3AF"
-                                                    />
-                                                </View>
-                                            </View>
-                                            <Text style={styles.inputLabel}>Observaciones (opcional)</Text>
-                                            <TextInput
-                                                style={[styles.input, styles.textArea]}
-                                                multiline
-                                                numberOfLines={3}
-                                                value={input.observations}
-                                                onChangeText={value =>
-                                                    setDeliveryInputs(state => ({
-                                                        ...state,
-                                                        [item.id]: {
-                                                            ...state[item.id],
-                                                            quantity: state[item.id]?.quantity ?? '',
-                                                            lotNumber: state[item.id]?.lotNumber ?? '',
-                                                            observations: value,
-                                                        },
-                                                    }))
-                                                }
-                                                placeholder="Notas sobre la entrega"
-                                                placeholderTextColor="#9CA3AF"
-                                            />
+                                        <View style={styles.itemInfoBlock}>
+                                            <Text style={styles.itemInfoLabel}>Solicitado</Text>
+                                            <Text style={styles.itemInfoValue}>{item.requestedQty} {unitLabel}</Text>
                                         </View>
-                                    ) : null}
+                                        <View style={styles.itemInfoBlock}>
+                                            <Text style={styles.itemInfoLabel}>Aprobado</Text>
+                                            <Text style={styles.itemInfoValue}>{approved} {unitLabel}</Text>
+                                        </View>
+                                        <View style={styles.itemInfoBlock}>
+                                            <Text style={styles.itemInfoLabel}>Entregado</Text>
+                                            <Text style={styles.itemInfoValue}>{delivered} {unitLabel}</Text>
+                                        </View>
+                                    </View>
                                 </View>
                             );
                         })}
@@ -501,62 +448,11 @@ export default function MaterialRequestDetailScreen() {
                         </View>
                     ) : null}
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Acciones</Text>
-
-                        {false && (
+                    {detail.status === 'sent' && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Registrar entregas</Text>
                             <View style={styles.card}>
-                                <Text style={styles.cardTitle}>Aprobar solicitud</Text>
-                                <Text style={styles.cardSubtitle}>Opcionalmente agrega observaciones para la aprobación.</Text>
-                                <TextInput
-                                    style={[styles.input, styles.textArea]}
-                                    multiline
-                                    numberOfLines={3}
-                                    value={''}
-                                    onChangeText={() => {}}
-                                    placeholder="Observaciones de aprobación"
-                                    placeholderTextColor="#9CA3AF"
-                                />
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, actionState === 'approve' && styles.disabledButton]}
-                                    onPress={handleApprove}
-                                    disabled={actionState === 'approve'}
-                                >
-                                    <Text style={styles.primaryButtonText}>
-                                        {actionState === 'approve' ? 'Aprobando...' : 'Aprobar solicitud'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {false && (
-                            <View style={styles.card}>
-                                <Text style={styles.cardTitle}>Rechazar solicitud</Text>
-                                <Text style={styles.cardSubtitle}>Indica el motivo del rechazo para notificar al solicitante.</Text>
-                                <TextInput
-                                    style={[styles.input, styles.textArea]}
-                                    multiline
-                                    numberOfLines={3}
-                                    value={''}
-                                    onChangeText={() => {}}
-                                    placeholder="Motivo del rechazo"
-                                    placeholderTextColor="#9CA3AF"
-                                />
-                                <TouchableOpacity
-                                    style={[styles.dangerButton, actionState === 'reject' && styles.disabledButton]}
-                                    onPress={handleReject}
-                                    disabled={actionState === 'reject'}
-                                >
-                                    <Text style={styles.dangerButtonText}>
-                                        {actionState === 'reject' ? 'Rechazando...' : 'Rechazar solicitud'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {detail.status === 'sent' && (
-                            <View style={styles.card}>
-                                <Text style={styles.cardTitle}>Registrar entregas</Text>
+                                <Text style={styles.cardTitle}>Completa la entrega</Text>
                                 <Text style={styles.cardSubtitle}>
                                     Completa la cantidad entregada por material y, si aplica, el número de lote.
                                 </Text>
@@ -616,8 +512,8 @@ export default function MaterialRequestDetailScreen() {
                                     </Text>
                                 </TouchableOpacity>
                             </View>
-                        )}
-                    </View>
+                        </View>
+                    )}
                 </ScrollView>
             ) : (
                 <View style={styles.centerContent}>
@@ -698,15 +594,13 @@ const styles = StyleSheet.create({
         textTransform: 'capitalize',
         fontWeight: '600',
     },
-    priorityPill: {
+    urgencyPill: {
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
     },
-    priorityText: {
+    urgencyText: {
         fontWeight: '600',
-        textTransform: 'capitalize',
     },
     title: {
         fontSize: 20,
@@ -779,11 +673,20 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginTop: 8,
     },
-    itemStat: {
-        fontSize: 12,
-        color: '#4B5563',
+    itemInfoBlock: {
+        flex: 1,
+        paddingRight: 12,
     },
-    pendingLabel: { marginTop: 4, fontSize: 12, fontWeight: '600', color: COLORS.primary },
+    itemInfoLabel: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    itemInfoValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#111827',
+        marginTop: 4,
+    },
     deliveryForm: {
         marginTop: 12,
     },
@@ -816,6 +719,17 @@ const styles = StyleSheet.create({
     textArea: {
         minHeight: 80,
         textAlignVertical: 'top',
+    },
+    itemObservation: {
+        marginTop: 12,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+    },
+    itemObservationText: {
+        fontSize: 13,
+        color: '#4B5563',
+        marginTop: 4,
     },
     deliveryRecord: {
         borderWidth: 1,

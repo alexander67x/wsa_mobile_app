@@ -4,36 +4,50 @@ import { router } from 'expo-router';
 import { Plus, Calendar, FileText, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Clock, ChartBar as BarChart3 } from 'lucide-react-native';
 import { listReports } from '@/services/reports';
 import type { Report } from '@/types/domain';
+import { listIncidencias } from '@/services/incidencias';
+import type { Incident } from '@/services/incidencias';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
+import { getRoleSlug } from '@/services/auth';
 
 export default function ReportsScreen() {
+  const roleSlug = getRoleSlug();
+  const isProjectLeadRole = roleSlug === 'responsable_proyecto';
+  const isSupervisorRole = roleSlug === 'supervisor';
+  const canViewIncidents = isProjectLeadRole || isSupervisorRole;
   const [activeFilter, setActiveFilter] = useState('all');
   const [reports, setReports] = useState<Report[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadReports = async () => {
+  const loadData = async () => {
     try {
-      const data = await listReports();
-      setReports(data);
+      const [reportsData, incidentsData] = await Promise.all([
+        listReports(),
+        canViewIncidents ? listIncidencias() : Promise.resolve([] as Incident[]),
+      ]);
+      setReports(reportsData);
+      setIncidents(incidentsData);
     } catch {
       setReports([]);
+      setIncidents([]);
     } finally {
       setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadReports();
-  }, []);
+    loadData();
+  }, [canViewIncidents]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    loadReports();
+    loadData();
   };
 
   const filteredReports = reports.filter(report => {
     if (activeFilter === 'all') return true;
+    if (activeFilter === 'incidents') return false;
     return report.status === (activeFilter as any);
   });
 
@@ -82,6 +96,52 @@ export default function ReportsScreen() {
     }
   };
 
+  const getIncidentStatusInfo = (status?: string) => {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
+      case 'abierta':
+        return { text: 'Abierta', color: '#F97316' };
+      case 'en_proceso':
+        return { text: 'En proceso', color: COLORS.primary };
+      case 'resuelta':
+        return { text: 'Resuelta', color: '#10B981' };
+      case 'verificacion':
+        return { text: 'Verificacion', color: '#3B82F6' };
+      case 'cerrada':
+        return { text: 'Cerrada', color: '#6B7280' };
+      case 'reabierta':
+        return { text: 'Reabierta', color: '#EF4444' };
+      default:
+        return { text: 'Sin estado', color: '#6B7280' };
+    }
+  };
+
+  const getSeverityInfo = (severity?: string) => {
+    const normalized = (severity || '').toLowerCase();
+    switch (normalized) {
+      case 'critica':
+        return { text: 'Critica', color: '#B91C1C', bg: '#FEE2E2' };
+      case 'alta':
+        return { text: 'Alta', color: '#DC2626', bg: '#FECACA' };
+      case 'media':
+        return { text: 'Media', color: '#D97706', bg: '#FEF3C7' };
+      case 'baja':
+        return { text: 'Baja', color: '#047857', bg: '#D1FAE5' };
+      default:
+        return { text: 'Sin severidad', color: '#6B7280', bg: '#E5E7EB' };
+    }
+  };
+
+  const filters = [
+    { key: 'all', label: 'Todos', count: reports.length },
+    { key: 'pending', label: 'Pendientes', count: reports.filter(r => r.status === 'pending').length },
+    { key: 'approved', label: 'Aprobados', count: reports.filter(r => r.status === 'approved').length },
+    { key: 'rejected', label: 'Rechazados', count: reports.filter(r => r.status === 'rejected').length },
+    ...(canViewIncidents ? [{ key: 'incidents', label: 'Incidencias', count: incidents.length }] : []),
+  ];
+
+  const showIncidents = canViewIncidents && activeFilter === 'incidents';
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -99,12 +159,7 @@ export default function ReportsScreen() {
 
         <View style={styles.filterContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {[
-              { key: 'all', label: 'Todos', count: reports.length },
-              { key: 'pending', label: 'Pendientes', count: reports.filter(r => r.status === 'pending').length },
-              { key: 'approved', label: 'Aprobados', count: reports.filter(r => r.status === 'approved').length },
-              { key: 'rejected', label: 'Rechazados', count: reports.filter(r => r.status === 'rejected').length },
-            ].map(filter => (
+            {filters.map(filter => (
               <TouchableOpacity
                 key={filter.key}
                 style={[
@@ -123,6 +178,7 @@ export default function ReportsScreen() {
             ))}
           </ScrollView>
         </View>
+
       </View>
 
       <ScrollView
@@ -137,53 +193,99 @@ export default function ReportsScreen() {
           />
         )}
       >
-        {filteredReports.map(report => (
-          <TouchableOpacity
-            key={report.id}
-            style={styles.reportCard}
-            onPress={() => router.push({ pathname: '/report-detail', params: { reportId: report.id } })}
-          >
-            <View style={styles.reportHeader}>
-              <View style={styles.typeContainer}>
-                {getTypeIcon(report.type)}
-                <Text style={styles.typeText}>{getTypeText(report.type)}</Text>
-              </View>
-              <View style={styles.statusContainer}>
-                {getStatusIcon(report.status)}
-                <Text style={[styles.statusText, { color: getStatusColor(report.status) }]}>
-                  {getStatusText(report.status)}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.reportTitle}>{report.title}</Text>
-            <Text style={styles.reportProject}>{report.project}</Text>
-
-            {report.progress !== undefined && (
-              <View style={styles.progressContainer}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>Avance reportado</Text>
-                  <Text style={styles.progressPercentage}>{report.progress}%</Text>
+        {showIncidents ? (
+          incidents.map(incident => {
+            const statusInfo = getIncidentStatusInfo(incident.status);
+            const severityInfo = getSeverityInfo(incident.severity);
+            return (
+              <View key={incident.id} style={styles.reportCard}>
+                <View style={styles.reportHeader}>
+                  <View style={styles.typeContainer}>
+                    <AlertTriangle size={20} color={severityInfo.color} />
+                    <Text style={[styles.typeText, { color: severityInfo.color }]}>Incidencia</Text>
+                  </View>
+                  <View style={styles.statusContainer}>
+                    <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
+                    <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                      {statusInfo.text}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${report.progress}%`, backgroundColor: getStatusColor(report.status) }
-                    ]}
-                  />
+
+                <Text style={styles.reportTitle}>{incident.title}</Text>
+                <Text style={styles.reportProject}>{incident.project || 'Sin proyecto'}</Text>
+
+                <View style={styles.incidentMetaRow}>
+                  <View style={styles.severityBadge}>
+                    <View style={[styles.severityTag, { backgroundColor: severityInfo.bg }]}>
+                      <Text style={[styles.severityText, { color: severityInfo.color }]}>
+                        {severityInfo.text}
+                      </Text>
+                    </View>
+                  </View>
+                  {incident.assignedToName ? (
+                    <Text style={styles.incidentAssignee}>Asignado a: {incident.assignedToName}</Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.reportFooter}>
+                  <View style={styles.dateContainer}>
+                    <Calendar size={16} color="#6B7280" />
+                    <Text style={styles.dateText}>{incident.date || 'Sin fecha'}</Text>
+                  </View>
                 </View>
               </View>
-            )}
-
-            <View style={styles.reportFooter}>
-              <View style={styles.dateContainer}>
-                <Calendar size={16} color="#6B7280" />
-                <Text style={styles.dateText}>{report.date}</Text>
+            );
+          })
+        ) : (
+          filteredReports.map(report => (
+            <TouchableOpacity
+              key={report.id}
+              style={styles.reportCard}
+              onPress={() => router.push({ pathname: '/report-detail', params: { reportId: report.id } })}
+            >
+              <View style={styles.reportHeader}>
+                <View style={styles.typeContainer}>
+                  {getTypeIcon(report.type)}
+                  <Text style={styles.typeText}>{getTypeText(report.type)}</Text>
+                </View>
+                <View style={styles.statusContainer}>
+                  {getStatusIcon(report.status)}
+                  <Text style={[styles.statusText, { color: getStatusColor(report.status) }]}>
+                    {getStatusText(report.status)}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+
+              <Text style={styles.reportTitle}>{report.title}</Text>
+              <Text style={styles.reportProject}>{report.project}</Text>
+
+              {report.progress !== undefined && (
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressHeader}>
+                    <Text style={styles.progressLabel}>Avance reportado</Text>
+                    <Text style={styles.progressPercentage}>{report.progress}%</Text>
+                  </View>
+                  <View style={styles.progressBar}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${report.progress}%`, backgroundColor: getStatusColor(report.status) }
+                      ]}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.reportFooter}>
+                <View style={styles.dateContainer}>
+                  <Calendar size={16} color="#6B7280" />
+                  <Text style={styles.dateText}>{report.date}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -209,6 +311,7 @@ const styles = StyleSheet.create({
   typeContainer: { flexDirection: 'row', alignItems: 'center' },
   typeText: { marginLeft: 8, color: COLORS.primary, fontWeight: '600' },
   statusContainer: { flexDirection: 'row', alignItems: 'center' },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   statusText: { marginLeft: 6, fontWeight: '600' },
   reportTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937', marginBottom: 4 },
   reportProject: { fontSize: 14, color: '#6B7280' },
@@ -221,4 +324,9 @@ const styles = StyleSheet.create({
   reportFooter: { marginTop: 12 },
   dateContainer: { flexDirection: 'row', alignItems: 'center' },
   dateText: { marginLeft: 8, color: '#6B7280' },
+  incidentMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  severityBadge: { flexDirection: 'row', alignItems: 'center' },
+  severityTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  severityText: { fontWeight: '600', fontSize: 12 },
+  incidentAssignee: { color: '#4B5563', fontSize: 13 },
 });

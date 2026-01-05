@@ -1,4 +1,3 @@
-import { USE_MOCKS } from '@/lib/config';
 import { fetchJson } from '@/lib/http';
 import { getUser, getRole } from '@/services/auth';
 import { getMyProjects } from '@/services/projects';
@@ -58,21 +57,6 @@ export interface IncidentDetail extends Incident {
 }
 
 export async function createIncident(payload: CreateIncidentPayload): Promise<{ id: string; incidencia: Incident }> {
-  if (USE_MOCKS) {
-    return Promise.resolve({
-      id: 'mock-incident',
-      incidencia: {
-        id: 'mock-incident',
-        projectId: payload.projectId,
-        title: payload.title,
-        type: 'incidence',
-        status: 'abierta',
-        severity: payload.severidad || 'media',
-        tipo: payload.tipo,
-      },
-    });
-  }
-
   const response = await fetchJson<{ id: string; incidencia: Incident }, typeof payload>(
     '/incidencias',
     { method: 'POST', body: payload }
@@ -87,8 +71,6 @@ export async function listIncidencias(params?: {
   status?: string;
   limit?: number;
 }): Promise<Incident[]> {
-  if (USE_MOCKS) return Promise.resolve([]);
-
   const user = getUser();
   const role = getRole();
   const ensuredEmployeeId = await (await import('@/services/auth')).ensureEmployeeId();
@@ -128,18 +110,6 @@ export async function listIncidencias(params?: {
 }
 
 export async function getIncidencia(id: string): Promise<IncidentDetail> {
-  if (USE_MOCKS) {
-    return Promise.resolve({
-      id,
-      projectId: 'mock',
-      title: 'Mock Incident',
-      type: 'incidence',
-      status: 'abierta',
-      description: 'Mock description',
-      images: [],
-    });
-  }
-
   const apiIncidencia = await fetchJson<IncidentDetail>(`/incidencias/${id}`);
   return apiIncidencia;
 }
