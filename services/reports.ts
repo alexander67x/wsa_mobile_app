@@ -280,6 +280,7 @@ export async function getReport(id: string): Promise<ReportDetail & { taskId?: s
     status,
     progress: undefined,
     author: authorName,
+    authorId: apiReport.authorId || undefined,
     date: dateValue,
     location: locationValue,
     description: descriptionValue,
@@ -336,3 +337,42 @@ export async function createReport(payload: {
   
   return { id: response.id };
 }
+
+type ReportReviewPayload = {
+  observations?: string;
+};
+
+type ApiReportReviewResponse = {
+  message?: string;
+  report?: ApiReportDetail;
+};
+
+export interface ReportReviewResult {
+  message: string;
+  report: Awaited<ReturnType<typeof getReport>>;
+}
+
+async function reviewReport(
+  action: 'approve' | 'reject',
+  id: string,
+  payload?: ReportReviewPayload
+): Promise<ReportReviewResult> {
+  const safeId = String(id);
+  const endpoint = `/reports/${safeId}/${action}`;
+  const response = await fetchJson<ApiReportReviewResponse, ReportReviewPayload>(endpoint, {
+    method: 'POST',
+    body: payload && Object.keys(payload).length > 0 ? payload : undefined,
+  });
+  const detail = await getReport(safeId);
+  return {
+    message:
+      response?.message ||
+      (action === 'approve' ? 'Reporte aprobado correctamente.' : 'Reporte rechazado correctamente.'),
+    report: detail,
+  };
+}
+
+export const approveReport = (id: string, payload?: ReportReviewPayload) =>
+  reviewReport('approve', id, payload);
+
+export const rejectReport = (id: string, payload?: ReportReviewPayload) => reviewReport('reject', id, payload);

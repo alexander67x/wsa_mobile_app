@@ -1,18 +1,55 @@
-import { useMemo, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, MapPin, Clock } from 'lucide-react-native';
 import { COLORS } from '@/theme';
-import { fetchJson } from '@/lib/http';
+import { AttendanceSession, getAttendanceCheck } from '@/services/attendance';
 
-const ENABLE_DETAIL_API = false; // Activa cuando el backend esté listo
-const DETAIL_PATH = (id: string) => `/attendance/checks/${id}`;
+const ENABLE_DETAIL_API = true;
+
+interface SessionView {
+  startLocation: string;
+  endLocation: string;
+  date: string;
+  checkIn: string;
+  checkOut: string;
+  hoursWorked: string;
+}
 
 export default function WorkSessionDetail() {
   const params = useLocalSearchParams();
   const router = useRouter();
 
-  const session = useMemo(() => {
+  const formatTimeShort = (date: Date) =>
+    date.toLocaleTimeString('es-PE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const parseDateSafe = (value?: string | null) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const getTimeLabel = (value?: string | null, fallbackIso?: string | null) => {
+    if (value) return value;
+    const parsed = parseDateSafe(fallbackIso || undefined);
+    return parsed ? formatTimeShort(parsed) : '--:--';
+  };
+
+  const mapSessionToView = (data: AttendanceSession): SessionView => {
+    const startLocation = data.startLocationLabel || data.location || 'Ubicación no disponible';
+    const endLocation = data.endLocationLabel || data.location || 'Ubicación no disponible';
+    const date = data.date || data.checkInAt?.slice(0, 10) || 'Fecha no disponible';
+    const checkIn = getTimeLabel(data.checkIn, data.checkInAt);
+    const checkOut = getTimeLabel(data.checkOut, data.checkOutAt);
+    const hoursWorked = data.hoursWorked != null ? `${data.hoursWorked}h trabajadas` : 'Horas no calculadas';
+
+    return { startLocation, endLocation, date, checkIn, checkOut, hoursWorked };
+  };
+
+  const buildSessionFromParams = (): SessionView => {
     const startLocation = (params.startLocation as string) || (params.location as string) || 'Ubicación no disponible';
     const endLocation = (params.endLocation as string) || (params.location as string) || 'Ubicación no disponible';
     const date = (params.date as string) || 'Fecha no disponible';
@@ -21,21 +58,28 @@ export default function WorkSessionDetail() {
     const hoursWorked = params.hoursWorked ? `${params.hoursWorked}h trabajadas` : 'Horas no calculadas';
 
     return { startLocation, endLocation, date, checkIn, checkOut, hoursWorked };
-  }, [params]);
+  };
+
+  const [session, setSession] = useState<SessionView>(buildSessionFromParams);
 
   useEffect(() => {
     const fetchDetail = async () => {
-      if (!ENABLE_DETAIL_API || !params.id) return;
+      const sessionId = (params.apiId as string) || (params.id as string);
+      if (!ENABLE_DETAIL_API || !sessionId) return;
       try {
-        // TODO: Conectar al backend cuando esté listo
-        await fetchJson<void, undefined>(DETAIL_PATH(String(params.id)), { method: 'GET' });
+        const apiSession = await getAttendanceCheck(String(sessionId));
+        setSession(mapSessionToView(apiSession));
       } catch (error) {
         console.log('Detalle de jornada no disponible aún (solo frontend)', error);
       }
     };
 
     fetchDetail();
-  }, [params.id]);
+  }, [params.apiId, params.id]);
+
+  useEffect(() => {
+    setSession(buildSessionFromParams());
+  }, [params]);
 
   const LocationCard = ({
     title,

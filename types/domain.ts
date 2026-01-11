@@ -58,6 +58,7 @@ export interface ReportDetail {
   status: 'pending' | 'approved' | 'rejected';
   progress?: number;
   author: string;
+  authorId?: Id;
   date: string;
   location: string;
   description: string;

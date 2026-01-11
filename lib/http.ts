@@ -9,6 +9,12 @@ export interface FetchOptions<T> {
   headers?: Record<string, string>;
 }
 
+export interface HttpError extends Error {
+  status?: number;
+  data?: unknown;
+  rawBody?: string;
+}
+
 export async function fetchJson<R = unknown, B = unknown>(path: string, opts: FetchOptions<B> = {}): Promise<R> {
   const { method = 'GET', body, token, headers = {} } = opts;
   
@@ -43,7 +49,11 @@ export async function fetchJson<R = unknown, B = unknown>(path: string, opts: Fe
   if (!res.ok) {
     const detail = json?.message || json?.error;
     const message = detail || res.statusText || 'Request failed';
-    throw new Error(`${res.status} ${message}`);
+    const error = new Error(`${res.status} ${message}`) as HttpError;
+    error.status = res.status;
+    error.data = json;
+    error.rawBody = text;
+    throw error;
   }
 
   return json as R;

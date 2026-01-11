@@ -5,7 +5,13 @@ import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/theme';
-import { fetchJson } from '@/lib/http';
+import {
+  createAttendanceCheck,
+  listAttendanceChecks,
+  AttendanceSession,
+  CheckEventPayload,
+  CheckEventType,
+} from '@/services/attendance';
 
 interface CheckInRecord {
   id: string;
@@ -19,16 +25,6 @@ interface CheckInRecord {
   startCoords?: Location.LocationObjectCoords | null;
   endCoords?: Location.LocationObjectCoords | null;
   apiId?: string;
-}
-
-type CheckEventType = 'check_in' | 'check_out';
-
-interface CheckEventPayload {
-  type: CheckEventType;
-  occurred_at: string;
-  location_label: string;
-  latitude?: number;
-  longitude?: number;
 }
 
 interface LocationSnapshot {
@@ -70,8 +66,7 @@ const mockRecords: CheckInRecord[] = [
   },
 ];
 
-const ENABLE_ATTENDANCE_API = false; // Activa esto cuando el backend esté listo
-const ATTENDANCE_PATH = '/attendance/checks';
+const ENABLE_ATTENDANCE_API = true;
 
 export default function CheckInScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -106,6 +101,67 @@ export default function CheckInScreen() {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+    });
+  };
+
+  const formatTimeShort = (date: Date) => {
+    return date.toLocaleTimeString('es-PE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const parseDateSafe = (value?: string | null) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const getTimeLabel = (value?: string | null, fallbackIso?: string | null) => {
+    if (value) return value;
+    const parsed = parseDateSafe(fallbackIso || undefined);
+    return parsed ? formatTimeShort(parsed) : '--:--';
+  };
+
+  const mapSessionToRecord = (session: AttendanceSession): CheckInRecord => {
+    const date = session.date || session.checkInAt?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+    const location =
+      session.location || session.startLocationLabel || session.endLocationLabel || 'Ubicación no disponible';
+
+    return {
+      id: session.id || session.apiId || `${Date.now()}`,
+      apiId: session.apiId || session.id,
+      date,
+      checkIn: getTimeLabel(session.checkIn, session.checkInAt),
+      checkOut: session.checkOut ? getTimeLabel(session.checkOut, session.checkOutAt) : undefined,
+      location,
+      hoursWorked: session.hoursWorked ?? undefined,
+      startLocationLabel: session.startLocationLabel || session.location || undefined,
+      endLocationLabel: session.endLocationLabel || session.location || undefined,
+      startCoords: session.startCoords ?? null,
+      endCoords: session.endCoords ?? null,
+    };
+  };
+
+  const buildCheckPointFromSession = (session: AttendanceSession, type: CheckEventType): CheckPoint => {
+    const isCheckIn = type === 'check_in';
+    const time = isCheckIn
+      ? getTimeLabel(session.checkIn, session.checkInAt)
+      : getTimeLabel(session.checkOut, session.checkOutAt);
+    const location = isCheckIn
+      ? session.startLocationLabel || session.location || 'Ubicación no disponible'
+      : session.endLocationLabel || session.location || 'Ubicación no disponible';
+    const coords = isCheckIn ? session.startCoords ?? null : session.endCoords ?? null;
+    const iso = isCheckIn ? session.checkInAt || new Date().toISOString() : session.checkOutAt || new Date().toISOString();
+
+    return { time, location, coords, iso };
+  };
+
+  const upsertHistoryRecord = (session: AttendanceSession) => {
+    const record = mapSessionToRecord(session);
+    setHistoryRecords((prev) => {
+      const filtered = prev.filter((item) => item.apiId !== record.apiId && item.id !== record.id);
+      return [record, ...filtered];
     });
   };
 
@@ -144,7 +200,11 @@ export default function CheckInScreen() {
     }
   };
 
-  const recordCheckEvent = async (type: CheckEventType, snapshot: LocationSnapshot, at: Date) => {
+  const recordCheckEvent = async (
+    type: CheckEventType,
+    snapshot: LocationSnapshot,
+    at: Date,
+  ): Promise<AttendanceSession | null> => {
     const payload: CheckEventPayload = {
       type,
       occurred_at: at.toISOString(),
@@ -155,16 +215,14 @@ export default function CheckInScreen() {
 
     try {
       if (ENABLE_ATTENDANCE_API) {
-        await fetchJson<void, CheckEventPayload>(ATTENDANCE_PATH, {
-          method: 'POST',
-          body: payload,
-        });
+        return await createAttendanceCheck(payload);
       } else {
         console.log('Payload listo para la API', payload);
       }
     } catch (error) {
       console.log('La marca está lista pero la API aún no respondió', error);
     }
+    return null;
   };
 
   const archiveSession = (entry: CheckPoint, exit: CheckPoint) => {
@@ -214,7 +272,7 @@ export default function CheckInScreen() {
       const previousCheckIn = checkInMeta;
       const previousCheckOut = checkOutMeta;
 
-      if (previousCheckIn && previousCheckOut) {
+      if (!ENABLE_ATTENDANCE_API && previousCheckIn && previousCheckOut) {
         archiveSession(previousCheckIn, previousCheckOut);
       }
 
@@ -227,11 +285,17 @@ export default function CheckInScreen() {
         iso: now.toISOString(),
       };
 
-      await recordCheckEvent('check_in', locationSnapshot, now);
+      const session = await recordCheckEvent('check_in', locationSnapshot, now);
 
-      setCheckInMeta(point);
-      setCheckOutMeta(null);
-      setIsCheckedIn(true);
+      if (session) {
+        setCheckInMeta(buildCheckPointFromSession(session, 'check_in'));
+        setCheckOutMeta(null);
+        setIsCheckedIn(true);
+      } else {
+        setCheckInMeta(point);
+        setCheckOutMeta(null);
+        setIsCheckedIn(true);
+      }
 
       Alert.alert(
         'Check-in Exitoso',
@@ -266,10 +330,16 @@ export default function CheckInScreen() {
         iso: now.toISOString(),
       };
 
-      await recordCheckEvent('check_out', locationSnapshot, now);
+      const session = await recordCheckEvent('check_out', locationSnapshot, now);
 
-      setIsCheckedIn(false);
-      setCheckOutMeta(point);
+      if (session) {
+        setIsCheckedIn(false);
+        setCheckOutMeta(buildCheckPointFromSession(session, 'check_out'));
+        upsertHistoryRecord(session);
+      } else {
+        setIsCheckedIn(false);
+        setCheckOutMeta(point);
+      }
 
       Alert.alert('Check-out Exitoso', `Has finalizado tu jornada a las ${point.time} en ${point.location}`, [
         { text: 'OK' },
@@ -299,6 +369,21 @@ export default function CheckInScreen() {
   const getTotalHoursThisWeek = () => {
     return historyRecords.reduce((total, record) => total + (record.hoursWorked || 0), 0);
   };
+
+  useEffect(() => {
+    if (!ENABLE_ATTENDANCE_API) return;
+
+    const loadHistory = async () => {
+      try {
+        const sessions = await listAttendanceChecks();
+        setHistoryRecords(sessions.map(mapSessionToRecord));
+      } catch (error) {
+        console.log('Historial de jornadas no disponible aún', error);
+      }
+    };
+
+    loadHistory();
+  }, []);
 
   return (
     <View style={styles.screen}>
@@ -398,7 +483,7 @@ export default function CheckInScreen() {
             <Text style={styles.statLabel}>Esta Semana</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{mockRecords.length}</Text>
+            <Text style={styles.statValue}>{historyRecords.length}</Text>
             <Text style={styles.statLabel}>Días Trabajados</Text>
           </View>
           <View style={styles.statCard}>
@@ -425,9 +510,11 @@ export default function CheckInScreen() {
                 <Text style={styles.historyLocation}>{record.location}</Text>
                 <View style={styles.historyTimes}>
                   <Text style={styles.historyTime}>
-                    {record.checkIn} - {record.checkOut}
+                    {record.checkIn || '--:--'} - {record.checkOut || '--:--'}
                   </Text>
-                  <Text style={styles.historyHours}>{record.hoursWorked}h trabajadas</Text>
+                  <Text style={styles.historyHours}>
+                    {record.hoursWorked != null ? `${record.hoursWorked}h trabajadas` : 'Horas no calculadas'}
+                  </Text>
                 </View>
               </View>
             </View>
