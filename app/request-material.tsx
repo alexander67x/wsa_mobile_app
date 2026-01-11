@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Pressable, Platform, KeyboardAvoidingView } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Package, Plus, Minus, Save } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +9,7 @@ import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from '@rea
 import { listCatalog, createMaterialRequest } from '@/services/materials';
 import { getMyProjects } from '@/services/projects';
 import type { CatalogItem } from '@/types/domain';
+import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 
 let materialsStatic: CatalogItem[] = [];
 
@@ -37,6 +38,7 @@ export default function RequestMaterialScreen() {
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showIosDatePicker, setShowIosDatePicker] = useState(false);
+  const { scrollRef, handleInputFocus, keyboardPadding } = useKeyboardScroll(48, 28);
 
   useEffect(() => {
     let mounted = true;
@@ -221,7 +223,19 @@ export default function RequestMaterialScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        style={styles.contentWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.content}
+          contentContainerStyle={[styles.contentContainer, { paddingBottom: keyboardPadding }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
         <View style={styles.formSection}>
           <Text style={styles.sectionTitle}>Informacion Basica</Text>
 
@@ -297,6 +311,7 @@ export default function RequestMaterialScreen() {
               placeholder="Describe brevemente el motivo"
               value={reason}
               onChangeText={setReason}
+              onFocus={handleInputFocus}
               placeholderTextColor="#9CA3AF"
             />
           </View>
@@ -358,6 +373,7 @@ export default function RequestMaterialScreen() {
                   keyboardType="numeric"
                   value={quantity}
                   onChangeText={setQuantity}
+                  onFocus={handleInputFocus}
                 />
                 <TouchableOpacity style={styles.qtyButton} onPress={() => setQuantity(String(Number(quantity) + 1))}>
                   <Plus size={18} color="#1F2937" />
@@ -410,10 +426,12 @@ export default function RequestMaterialScreen() {
             numberOfLines={4}
             value={observations}
             onChangeText={setObservations}
+            onFocus={handleInputFocus}
             placeholderTextColor="#9CA3AF"
           />
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -435,6 +453,8 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
   content: { flex: 1 },
+  contentWrapper: { flex: 1 },
+  contentContainer: { paddingBottom: 32 },
   formSection: { backgroundColor: '#FFFFFF', margin: 16, padding: 16, borderRadius: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, color: '#111827' },
   formGroup: { marginBottom: 16 },

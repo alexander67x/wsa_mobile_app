@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Modal, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Camera, MapPin, Save, Trash2, Plus, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -13,8 +13,8 @@ import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { listCatalog } from '@/services/materials';
 import type { ProjectDetail } from '@/types/domain';
 import type { CatalogItem } from '@/types/domain';
-import { Switch } from 'react-native';
 import { COLORS } from '@/theme';
+import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 
 interface ImageWithTimestamp {
   uri: string;
@@ -48,6 +48,7 @@ export default function CreateReportScreen() {
   const [selectedMaterials, setSelectedMaterials] = useState<SelectedMaterial[]>([]);
   const [catalogMaterials, setCatalogMaterials] = useState<CatalogItem[]>([]);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [selectedMaterialForAdd, setSelectedMaterialForAdd] = useState<string>('');
   const [materialQuantity, setMaterialQuantity] = useState('');
@@ -62,6 +63,18 @@ export default function CreateReportScreen() {
   const isProjectLeadRole = roleSlug === 'responsable_proyecto';
   const isReportCreationRestricted = isProjectLeadRole && !sendAsIncident;
   const saveButtonDisabled = isSubmitting || isReportCreationRestricted;
+  const { scrollRef, handleInputFocus, keyboardPadding } = useKeyboardScroll(56, 32);
+  const { scrollRef: modalScrollRef, handleInputFocus: handleModalInputFocus, keyboardPadding: modalKeyboardPadding } = useKeyboardScroll(32, 20);
+  const handleTitleFocus = (event: any) => {
+    handleInputFocus(event);
+    const target = event?.target;
+    const scrollView = scrollRef.current;
+    if (target && scrollView?.scrollResponderScrollNativeHandleToKeyboard) {
+      setTimeout(() => {
+        scrollView.scrollResponderScrollNativeHandleToKeyboard(target, 120, true);
+      }, 20);
+    }
+  };
 
   const handleToggleChange = (value: boolean) => {
     setSendAsIncident(value);
@@ -123,16 +136,34 @@ export default function CreateReportScreen() {
 
       // Load catalog materials with projectId
       setIsLoadingCatalog(true);
+      setCatalogError(null);
       listCatalog(String(projectId))
         .then((materials) => {
-          setCatalogMaterials(materials || []);
-          if (materials.length > 0) {
-            setSelectedMaterialForAdd(materials[0].id);
+          const items = materials || [];
+          setCatalogMaterials(items);
+          if (items.length > 0) {
+            setSelectedMaterialForAdd(items[0].id);
           }
         })
         .catch((error) => {
-          console.error('Error loading catalog:', error);
-          // Don't show error, just continue without catalog
+          console.warn('Catálogo no disponible para el proyecto:', error);
+          const rawMessage = typeof error?.message === 'string' ? error.message : '';
+          const normalizedMessage = rawMessage.toLowerCase();
+          const warehouseMissing =
+            normalizedMessage.includes('almac') && normalizedMessage.includes('activo');
+          const friendlyMessage = warehouseMissing
+            ? 'No puedes agregar materiales porque este proyecto no tiene un almacén activo. Pide a un administrador que lo cree para habilitar el catálogo.'
+            : 'No pudimos cargar el catálogo de materiales en este momento. Intenta de nuevo más tarde.';
+          setCatalogMaterials([]);
+          setSelectedMaterialForAdd('');
+          setCatalogError(friendlyMessage);
+          if (warehouseMissing) {
+            Alert.alert('Catálogo no disponible', friendlyMessage, [
+              { text: 'OK', onPress: () => router.back() },
+            ]);
+          } else {
+            Alert.alert('Catálogo no disponible', friendlyMessage);
+          }
         })
         .finally(() => setIsLoadingCatalog(false));
     } else {
@@ -520,7 +551,19 @@ export default function CreateReportScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        style={styles.contentWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.content}
+          contentContainerStyle={[styles.contentContainer, { paddingBottom: keyboardPadding }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Cargando información...</Text>
@@ -584,6 +627,7 @@ export default function CreateReportScreen() {
                       placeholder="Ingresa el título de la incidencia"
                       value={title}
                       onChangeText={setTitle}
+                      onFocus={handleTitleFocus}
                       placeholderTextColor="#9CA3AF"
                     />
                   </View>
@@ -595,6 +639,7 @@ export default function CreateReportScreen() {
                       placeholder="Describe la incidencia en detalle..."
                       value={description}
                       onChangeText={setDescription}
+                      onFocus={handleInputFocus}
                       multiline
                       numberOfLines={6}
                       textAlignVertical="top"
@@ -673,6 +718,7 @@ export default function CreateReportScreen() {
                       placeholder="Ingresa el título del reporte"
                       value={title}
                       onChangeText={setTitle}
+                      onFocus={handleTitleFocus}
                       placeholderTextColor="#9CA3AF"
                     />
                   </View>
@@ -684,6 +730,7 @@ export default function CreateReportScreen() {
                       placeholder="Describe el avance, incidencias o detalles del trabajo realizado..."
                       value={description}
                       onChangeText={setDescription}
+                      onFocus={handleInputFocus}
                       multiline
                       numberOfLines={6}
                       textAlignVertical="top"
@@ -698,6 +745,7 @@ export default function CreateReportScreen() {
                       placeholder="Describe cualquier dificultad o problema encontrado durante el trabajo..."
                       value={difficulties}
                       onChangeText={setDifficulties}
+                      onFocus={handleInputFocus}
                       multiline
                       numberOfLines={4}
                       textAlignVertical="top"
@@ -715,9 +763,20 @@ export default function CreateReportScreen() {
                     >
                       <Plus size={20} color={COLORS.primary} />
                       <Text style={styles.addMaterialButtonText}>
-                        {isLoadingCatalog ? 'Cargando catálogo...' : 'Agregar Material'}
+                        {isLoadingCatalog
+                          ? 'Cargando catálogo...'
+                          : catalogError
+                          ? 'Catálogo no disponible'
+                          : 'Agregar Material'}
                       </Text>
                     </TouchableOpacity>
+
+                    {catalogError && (
+                      <View style={styles.catalogAlert}>
+                        <Text style={styles.catalogAlertTitle}>Catálogo no disponible</Text>
+                        <Text style={styles.catalogAlertText}>{catalogError}</Text>
+                      </View>
+                    )}
 
                     {selectedMaterials.length > 0 && (
                       <View style={styles.materialsList}>
@@ -755,6 +814,7 @@ export default function CreateReportScreen() {
                       placeholder="Observaciones, recomendaciones o comentarios adicionales..."
                       value={observations}
                       onChangeText={setObservations}
+                      onFocus={handleInputFocus}
                       multiline
                       numberOfLines={4}
                       textAlignVertical="top"
@@ -826,7 +886,8 @@ export default function CreateReportScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Material Selection Modal */}
       <Modal
@@ -847,7 +908,13 @@ export default function CreateReportScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <ScrollView
+              ref={modalScrollRef}
+              style={styles.modalBody}
+              contentContainerStyle={{ paddingBottom: modalKeyboardPadding + 12 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
               <View style={styles.modalFormGroup}>
                 <Text style={styles.modalLabel}>
                   Seleccionar Material <Text style={styles.required}>*</Text>
@@ -909,6 +976,7 @@ export default function CreateReportScreen() {
                         placeholder="Ingresa la cantidad"
                         value={materialQuantity}
                         onChangeText={setMaterialQuantity}
+                        onFocus={handleModalInputFocus}
                         keyboardType="decimal-pad"
                         placeholderTextColor="#9CA3AF"
                       />
@@ -921,6 +989,7 @@ export default function CreateReportScreen() {
                         placeholder="Ej: Material usado en cimientos"
                         value={materialObservations}
                         onChangeText={setMaterialObservations}
+                        onFocus={handleModalInputFocus}
                         multiline
                         numberOfLines={3}
                         textAlignVertical="top"
@@ -969,6 +1038,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  contentContainer: {
+    paddingBottom: 40,
+  },
+  contentWrapper: {
+    flex: 1,
   },
   formSection: {
     backgroundColor: '#FFFFFF',
@@ -1213,6 +1288,24 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  catalogAlert: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  catalogAlertTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  catalogAlertText: {
+    fontSize: 13,
+    color: '#92400E',
   },
   switchContainer: {
     flexDirection: 'row',

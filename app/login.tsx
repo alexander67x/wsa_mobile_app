@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Eye, EyeOff, User, Lock } from 'lucide-react-native';
 import { registerDevicePushToken } from '@/services/notifications';
 import { COLORS } from '@/theme';
+import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -21,6 +22,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { scrollRef, handleInputFocus, keyboardPadding } = useKeyboardScroll(48, 24);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -49,8 +51,11 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
+        contentInset={{ bottom: keyboardPadding }}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
@@ -80,6 +85,7 @@ export default function LoginScreen() {
                 placeholder="Ingresa tu usuario"
                 value={username}
                 onChangeText={setUsername}
+                onFocus={handleInputFocus}
                 autoCapitalize="none"
                 placeholderTextColor="#9CA3AF"
                 returnKeyType="next"
@@ -96,6 +102,7 @@ export default function LoginScreen() {
                 placeholder="Ingresa tu contraseña"
                 value={password}
                 onChangeText={setPassword}
+                onFocus={handleInputFocus}
                 secureTextEntry={!showPassword}
                 placeholderTextColor="#9CA3AF"
                 returnKeyType="done"

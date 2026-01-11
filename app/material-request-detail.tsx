@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -28,6 +30,7 @@ import { deliverMaterialRequest, getMaterialRequest } from '@/services/materials
 import type { MaterialRequestDetail } from '@/types/domain';
 import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { COLORS } from '@/theme';
+import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 
 const STATUS_COLORS: Record<string, string> = {
     draft: '#6B7280',
@@ -64,6 +67,7 @@ export default function MaterialRequestDetailScreen() {
     const [globalDeliveryNotes, setGlobalDeliveryNotes] = useState('');
     const [deliveryImages, setDeliveryImages] = useState<DeliveryImage[]>([]);
     const [isUploadingImages, setIsUploadingImages] = useState(false);
+    const { scrollRef, handleInputFocus, keyboardPadding } = useKeyboardScroll(48, 24);
 
     const statusColor = STATUS_COLORS[detail?.status ?? 'pending'] ?? '#6B7280';
 
@@ -326,10 +330,27 @@ export default function MaterialRequestDetailScreen() {
                     <Text style={styles.loadingText}>Cargando información...</Text>
                 </View>
             ) : detail ? (
-                <ScrollView
-                    style={styles.scrollView}
-                    refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+                <KeyboardAvoidingView
+                    style={styles.contentWrapper}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    keyboardVerticalOffset={0}
                 >
+                    <ScrollView
+                        ref={scrollRef}
+                        style={styles.scrollView}
+                        contentContainerStyle={[styles.contentContainer, { paddingBottom: keyboardPadding }]}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="on-drag"
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={isRefreshing}
+                                onRefresh={onRefresh}
+                                tintColor={COLORS.primary}
+                                colors={[COLORS.primary]}
+                            />
+                        }
+                    >
                     <View style={styles.section}>
                         <View style={styles.statusRow}>
                             <View style={[styles.statusPill, { backgroundColor: `${statusColor}15` }]}>
@@ -491,6 +512,7 @@ export default function MaterialRequestDetailScreen() {
                                     numberOfLines={3}
                                     value={globalDeliveryNotes}
                                     onChangeText={setGlobalDeliveryNotes}
+                                    onFocus={handleInputFocus}
                                     placeholder="Notas generales de la entrega"
                                     placeholderTextColor="#9CA3AF"
                                 />
@@ -514,7 +536,8 @@ export default function MaterialRequestDetailScreen() {
                             </View>
                         </View>
                     )}
-                </ScrollView>
+                    </ScrollView>
+                </KeyboardAvoidingView>
             ) : (
                 <View style={styles.centerContent}>
                     <Text style={styles.errorText}>No se encontró la información de la solicitud.</Text>
@@ -547,6 +570,12 @@ const styles = StyleSheet.create({
         color: '#1F2937',
     },
     scrollView: {
+        flex: 1,
+    },
+    contentContainer: {
+        paddingBottom: 32,
+    },
+    contentWrapper: {
         flex: 1,
     },
     centerContent: {

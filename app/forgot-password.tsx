@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Mail, FileText } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { COLORS } from '@/theme';
 import { enviarCorreoAdmin, enviarCorreoEmpleado } from '@/services/emailService';
+import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { scrollRef, handleInputFocus, keyboardPadding } = useKeyboardScroll(48, 24);
 
   const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value.trim());
 
@@ -49,7 +51,7 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar style="dark" />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -59,7 +61,15 @@ export default function ForgotPasswordScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <View style={styles.body}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        contentInset={{ bottom: keyboardPadding }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.label}>Coloca tu gmail</Text>
         <View style={styles.inputWrapper}>
           <Mail size={20} color={COLORS.mutedText} />
@@ -71,6 +81,7 @@ export default function ForgotPasswordScreen() {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            onFocus={handleInputFocus}
           />
         </View>
 
@@ -85,13 +96,14 @@ export default function ForgotPasswordScreen() {
             numberOfLines={4}
             value={reason}
             onChangeText={setReason}
+            onFocus={handleInputFocus}
           />
         </View>
 
         <TouchableOpacity style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={isSubmitting}>
           {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Enviar solicitud</Text>}
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -101,7 +113,8 @@ const styles = StyleSheet.create({
   header: { backgroundColor: COLORS.primary, paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  body: { flex: 1, padding: 20 },
+  body: { flex: 1 },
+  bodyContent: { padding: 20, paddingBottom: 32 },
   label: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: COLORS.primaryBorder, paddingHorizontal: 16, paddingVertical: 12, shadowColor: COLORS.primaryShadow, shadowOpacity: 0.08, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 2 },
   textAreaWrapper: { alignItems: 'flex-start' },

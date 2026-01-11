@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Save, Camera } from 'lucide-react-native';
 import { addCard } from '@/services/kanban';
 import { getUser } from '@/services/auth';
 import { router } from 'expo-router';
 import { COLORS } from '@/theme';
+import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 
 export default function WorkerCreateReport() {
   const [description, setDescription] = useState('');
   const [photosCount, setPhotosCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { scrollRef, handleInputFocus, keyboardPadding } = useKeyboardScroll(48, 24);
 
   const takePhoto = () => {
     // Placeholder para demo – integrar expo-camera o image-picker cuando se conecte
@@ -44,7 +46,19 @@ export default function WorkerCreateReport() {
   return (
     <View style={styles.container}>
       <View style={styles.header}><Text style={styles.headerTitle}>Nuevo Reporte</Text></View>
-      <View style={styles.body}>
+      <KeyboardAvoidingView
+        style={styles.bodyWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.body}
+          contentContainerStyle={[styles.bodyContent, { paddingBottom: keyboardPadding }]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.card}>
           <Text style={styles.label}>Proyecto</Text>
           <Text style={styles.value}>Green Tower</Text>
@@ -60,6 +74,7 @@ export default function WorkerCreateReport() {
             numberOfLines={5}
             value={description}
             onChangeText={setDescription}
+            onFocus={handleInputFocus}
           />
         </View>
 
@@ -71,7 +86,8 @@ export default function WorkerCreateReport() {
           </TouchableOpacity>
           <Text style={styles.hint}>Fotos añadidas: {photosCount}</Text>
         </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={styles.footer}>
         <TouchableOpacity style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]} disabled={isSubmitting} onPress={handleSubmit}>
@@ -87,7 +103,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   header: { backgroundColor: COLORS.primary, paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16 },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  body: { flex: 1, padding: 16 },
+  body: { flex: 1 },
+  bodyWrapper: { flex: 1 },
+  bodyContent: { padding: 16, paddingBottom: 24 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 12 },
   label: { color: '#374151', fontWeight: '600', marginBottom: 8 },
   value: { color: '#111827' },
