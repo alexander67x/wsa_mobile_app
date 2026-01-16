@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, RefreshControl } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Calendar, FileText, Plus, CheckCircle, Clock, Play } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -10,15 +10,16 @@ import type { ProjectDetail, Report } from '@/types/domain';
 import { getRoleSlug } from '@/services/auth';
 
 export default function TaskDetailScreen() {
-  const { projectId, taskId } = useLocalSearchParams();
+  const { projectId, taskId, fromKanban } = useLocalSearchParams();
   const roleSlug = getRoleSlug();
-  const isProjectLeadRole = roleSlug === 'responsable_proyecto';
+  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto' || roleSlug === 'supervisor';
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
+  const loadTask = async () => {
     if (!projectId || !taskId) {
       Alert.alert('Error', 'Faltan parámetros necesarios');
       router.back();
@@ -26,28 +27,33 @@ export default function TaskDetailScreen() {
     }
 
     setIsLoading(true);
-    Promise.all([
-      getProject(String(projectId)),
-      listReports(String(projectId), String(taskId))
-    ])
-      .then(([projectData, reportsData]) => {
-        setProject(projectData);
-        const foundTask = projectData.tasks.find(t => t.id === String(taskId));
-        if (foundTask) {
-          setTask(foundTask);
-          // Los reportes ya vienen filtrados por taskId desde la API
-          setReports(reportsData);
-        } else {
-          Alert.alert('Error', 'Tarea no encontrada');
-          router.back();
-        }
-      })
-      .catch((error) => {
-        console.error('Error loading task:', error);
-        Alert.alert('Error', 'No se pudo cargar la información de la tarea');
+    try {
+      const [projectData, reportsData] = await Promise.all([
+        getProject(String(projectId)),
+        listReports(String(projectId), String(taskId)),
+      ]);
+      setProject(projectData);
+      const foundTask = projectData.tasks.find(t => t.id === String(taskId));
+      if (foundTask) {
+        setTask(foundTask);
+        // Los reportes ya vienen filtrados por taskId desde la API
+        setReports(reportsData);
+      } else {
+        Alert.alert('Error', 'Tarea no encontrada');
         router.back();
-      })
-      .finally(() => setIsLoading(false));
+      }
+    } catch (error) {
+      console.error('Error loading task:', error);
+      Alert.alert('Error', 'No se pudo cargar la información de la tarea');
+      router.back();
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTask();
   }, [projectId, taskId]);
 
   if (isLoading || !task || !project) {
@@ -131,7 +137,29 @@ export default function TaskDetailScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              setIsRefreshing(true);
+              loadTask();
+            }}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        )}
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Detalles de la tarea</Text>
+          <View style={styles.detailCard}>
+            <Text style={styles.detailLabel}>Descripcion</Text>
+            <Text style={styles.detailValue}>{task.description || 'Sin descripcion registrada'}</Text>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <FileText size={20} color={COLORS.primary} />
@@ -143,7 +171,7 @@ export default function TaskDetailScreen() {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No hay reportes para esta tarea</Text>
               <Text style={styles.emptySubtext}>
-                {isProjectLeadRole
+                {isIncidentOnlyRole
                   ? 'Registra una incidencia para documentar esta tarea.'
                   : 'Crea un reporte para registrar el avance de esta tarea'}
               </Text>
@@ -173,27 +201,29 @@ export default function TaskDetailScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.createReportButton}
-          onPress={() => {
-            if (!projectId || !taskId) return;
-            const params: Record<string, string> = {
-              projectId: String(projectId),
-              taskId: String(taskId),
-            };
-            if (isProjectLeadRole) {
-              params.sendAsIncident = 'true';
-            }
-            router.push({ pathname: '/create-report', params });
-          }}
-        >
-          <Plus size={20} color="#FFFFFF" />
-          <Text style={styles.createReportButtonText}>
-            {isProjectLeadRole ? 'Reportar Incidencia' : 'Crear Reporte de Avance'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {fromKanban !== 'true' && (
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.createReportButton}
+            onPress={() => {
+              if (!projectId || !taskId) return;
+              const params: Record<string, string> = {
+                projectId: String(projectId),
+                taskId: String(taskId),
+              };
+              if (isIncidentOnlyRole) {
+                params.sendAsIncident = 'true';
+              }
+              router.push({ pathname: '/create-report', params });
+            }}
+          >
+            <Plus size={20} color="#FFFFFF" />
+            <Text style={styles.createReportButtonText}>
+              {isIncidentOnlyRole ? 'Reportar Incidencia' : 'Crear Reporte de Avance'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -221,6 +251,9 @@ const styles = StyleSheet.create({
   section: { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937' },
+  detailCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 12 },
+  detailLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  detailValue: { fontSize: 14, color: '#1F2937' },
   reportCount: { fontSize: 16, color: '#6B7280', marginLeft: 'auto' },
   emptyContainer: { backgroundColor: '#FFFFFF', padding: 32, borderRadius: 12, alignItems: 'center' },
   emptyText: { fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 8 },

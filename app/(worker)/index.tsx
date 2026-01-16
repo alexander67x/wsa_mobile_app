@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { MapPin, Calendar, ChartBar as BarChart3, Plus, Search } from 'lucide-react-native';
-import { getMyProjects } from '@/services/projects';
+import { getMyProjects, getProject } from '@/services/projects';
+import { listReports } from '@/services/reports';
 import type { Project } from '@/types/domain';
 import { COLORS } from '@/theme';
 
@@ -14,8 +15,38 @@ export default function WorkerHome() {
 
   const loadProjects = async () => {
     try {
-      const data = await getMyProjects();
-      setProjects(data);
+      const projectList = await getMyProjects();
+      const enrichedProjects = await Promise.all(
+        projectList.map(async (project) => {
+          try {
+            const [detail, projectReports] = await Promise.all([
+              getProject(project.id),
+              listReports(project.id),
+            ]);
+            const tasks = detail.tasks || [];
+            const completedTasks = tasks.filter(task => task.status === 'completed').length;
+            const derivedProgress = tasks.length ? Math.round((completedTasks / tasks.length) * 100) : undefined;
+            const normalizedProgress = Number(detail.progress);
+            const resolvedProgress = Number.isFinite(normalizedProgress)
+              ? normalizedProgress
+              : derivedProgress ?? project.progress ?? 0;
+            return {
+              ...project,
+              progress: resolvedProgress,
+              tasksCount: tasks.length || project.tasksCount || 0,
+              reportsCount: projectReports.length || project.reportsCount || 0,
+            };
+          } catch (error) {
+            console.warn('Error loading project detail:', error);
+            return {
+              ...project,
+              tasksCount: project.tasksCount ?? 0,
+              reportsCount: project.reportsCount ?? 0,
+            };
+          }
+        }),
+      );
+      setProjects(enrichedProjects);
     } catch (error) {
       console.error('Error loading projects:', error);
       setProjects([]);

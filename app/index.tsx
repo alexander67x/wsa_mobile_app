@@ -5,9 +5,20 @@ import { COLORS } from '@/theme';
 
 export default function IndexScreen() {
   useEffect(() => {
-    // Check if user is logged in
-    // For demo purposes, redirect to login
-    router.replace('/login');
+    let isMounted = true;
+    (async () => {
+      const Auth = await import('@/services/auth');
+      const session = await Auth.restoreSession();
+      if (!isMounted) return;
+      if (session?.token) {
+        router.replace(session.role === 'worker' ? '/(worker)' : '/(tabs)');
+        return;
+      }
+      router.replace('/login');
+    })();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

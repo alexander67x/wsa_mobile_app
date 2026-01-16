@@ -67,8 +67,11 @@ export default function RequestMaterialScreen() {
       setSelectedMaterial('');
       listCatalog(selectedProject)
         .then(items => {
-          materialsStatic = items;
-          setSelectedMaterial(items[0]?.id || '');
+          const uniqueItems = items.filter((item, index) => {
+            return items.findIndex(other => String(other.id) === String(item.id)) === index;
+          });
+          materialsStatic = uniqueItems;
+          setSelectedMaterial(uniqueItems[0]?.id || '');
         })
         .catch(() => {});
     } else {

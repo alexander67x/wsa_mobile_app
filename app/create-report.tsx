@@ -37,6 +37,8 @@ const reportTypes = [
 
 export default function CreateReportScreen() {
   const { projectId, taskId, sendAsIncident: sendAsIncidentParam } = useLocalSearchParams();
+  const roleSlug = getRoleSlug();
+  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto' || roleSlug === 'supervisor';
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
   const [reportType, setReportType] = useState('progress');
@@ -55,12 +57,12 @@ export default function CreateReportScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
-  const [sendAsIncident, setSendAsIncident] = useState(sendAsIncidentParam === 'true');
+  const [sendAsIncident, setSendAsIncident] = useState(
+    isIncidentOnlyRole ? true : sendAsIncidentParam === 'true',
+  );
   const [incidentType, setIncidentType] = useState<'falla_equipos' | 'accidente' | 'retraso_material' | 'problema_calidad' | 'otro'>('otro');
   const [incidentSeverity, setIncidentSeverity] = useState<'critica' | 'alta' | 'media' | 'baja'>('media');
-  const roleSlug = getRoleSlug();
-  const isProjectLeadRole = roleSlug === 'responsable_proyecto';
-  const isReportCreationRestricted = isProjectLeadRole && !sendAsIncident;
+  const isReportCreationRestricted = isIncidentOnlyRole && !sendAsIncident;
   const saveButtonDisabled = isSubmitting || isReportCreationRestricted;
 
   const handleToggleChange = (value: boolean) => {
@@ -77,6 +79,12 @@ export default function CreateReportScreen() {
       setIncidentSeverity('media');
     }
   };
+
+  useEffect(() => {
+    if (isIncidentOnlyRole && !sendAsIncident) {
+      handleToggleChange(true);
+    }
+  }, [isIncidentOnlyRole, sendAsIncident]);
 
   useEffect(() => {
     // Request camera, media library and location permissions
@@ -318,7 +326,7 @@ export default function CreateReportScreen() {
 
   const handleSave = async () => {
     if (isReportCreationRestricted) {
-      Alert.alert('Acceso restringido', 'Los responsables de proyecto no pueden enviar reportes desde la aplicación.');
+      Alert.alert('Acceso restringido', 'No tienes permisos para crear reportes de avance.');
       return;
     }
     if (!projectId) {
@@ -549,7 +557,7 @@ export default function CreateReportScreen() {
               )}
 
               {/* Solo mostrar toggle si no viene desde select-project-type */}
-              {!sendAsIncidentParam && (
+              {!sendAsIncidentParam && !isIncidentOnlyRole && (
                 <View style={styles.formGroup}>
                   <View style={styles.switchContainer}>
                     <View style={styles.switchLabelContainer}>

@@ -10,10 +10,10 @@ import { getRoleSlug } from '@/services/auth';
 
 export default function SelectProjectTypeScreen() {
   const roleSlug = getRoleSlug();
-  const isProjectLeadRole = roleSlug === 'responsable_proyecto';
+  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto' || roleSlug === 'supervisor';
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<'report' | 'incident' | null>(isProjectLeadRole ? 'incident' : null);
+  const [selectedType, setSelectedType] = useState<'report' | 'incident' | null>(isIncidentOnlyRole ? 'incident' : null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -158,7 +158,7 @@ export default function SelectProjectTypeScreen() {
                 </Text>
 
                 <View style={styles.typeContainer}>
-                  {!isProjectLeadRole && (
+                  {!isIncidentOnlyRole && (
                     <TouchableOpacity
                       style={[
                         styles.typeCard,

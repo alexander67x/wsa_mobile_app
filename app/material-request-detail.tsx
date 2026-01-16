@@ -5,6 +5,7 @@ import {
     RefreshControl,
     ScrollView,
     StyleSheet,
+    Image,
     Text,
     TextInput,
     TouchableOpacity,
@@ -119,10 +120,16 @@ export default function MaterialRequestDetailScreen() {
         setDeliveryImages(prev => [...prev, ...mapped]);
     };
 
+    const resolveImageMediaType = () => {
+        const modern = (ImagePicker as any).MediaType?.Images;
+        if (modern) return modern;
+        return ImagePicker.MediaTypeOptions.Images;
+    };
+
     const pickDeliveryImages = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: resolveImageMediaType(),
                 allowsMultipleSelection: true,
                 quality: 0.8,
             });
@@ -138,7 +145,7 @@ export default function MaterialRequestDetailScreen() {
     const takeDeliveryPhoto = async () => {
         try {
             const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: resolveImageMediaType(),
                 quality: 0.8,
                 allowsEditing: true,
             });
@@ -457,6 +464,106 @@ export default function MaterialRequestDetailScreen() {
                                     Completa la cantidad entregada por material y, si aplica, el número de lote.
                                 </Text>
 
+                                {deliverableItems.map(item => {
+                                    const unitLabel = item.unit || 'Sin unidad';
+                                    const input = deliveryInputs[item.id] ?? {
+                                        quantity: '',
+                                        lotNumber: '',
+                                        observations: '',
+                                    };
+
+                                    return (
+                                        <View key={item.id} style={styles.deliveryForm}>
+                                            <Text style={styles.deliveryFormLabel}>{item.materialName}</Text>
+                                            <View style={styles.itemStatsRow}>
+                                                <View style={styles.itemInfoBlock}>
+                                                    <Text style={styles.itemInfoLabel}>Solicitado</Text>
+                                                    <Text style={styles.itemInfoValue}>
+                                                        {item.requestedQty} {unitLabel}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.itemInfoBlock}>
+                                                    <Text style={styles.itemInfoLabel}>Aprobado</Text>
+                                                    <Text style={styles.itemInfoValue}>
+                                                        {item.approvedQty ?? item.requestedQty} {unitLabel}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <View style={styles.deliveryInputsRow}>
+                                                <View style={styles.deliveryInputWrapper}>
+                                                    <Text style={styles.inputLabel}>Cantidad entregada</Text>
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        keyboardType="numeric"
+                                                        value={input.quantity}
+                                                        onChangeText={text =>
+                                                            setDeliveryInputs(current => {
+                                                                const previous = current[item.id] ?? {
+                                                                    quantity: '',
+                                                                    lotNumber: '',
+                                                                    observations: '',
+                                                                };
+                                                                return {
+                                                                    ...current,
+                                                                    [item.id]: { ...previous, quantity: text },
+                                                                };
+                                                            })
+                                                        }
+                                                        placeholder={`Ej: 5 ${unitLabel}`}
+                                                        placeholderTextColor="#9CA3AF"
+                                                    />
+                                                </View>
+                                                <View style={styles.deliveryInputWrapper}>
+                                                    <Text style={styles.inputLabel}>Lote (opcional)</Text>
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        value={input.lotNumber}
+                                                        onChangeText={text =>
+                                                            setDeliveryInputs(current => {
+                                                                const previous = current[item.id] ?? {
+                                                                    quantity: '',
+                                                                    lotNumber: '',
+                                                                    observations: '',
+                                                                };
+                                                                return {
+                                                                    ...current,
+                                                                    [item.id]: { ...previous, lotNumber: text },
+                                                                };
+                                                            })
+                                                        }
+                                                        placeholder="Ej: L-4021"
+                                                        placeholderTextColor="#9CA3AF"
+                                                    />
+                                                </View>
+                                            </View>
+                                            <View style={styles.itemObservation}>
+                                                <Text style={styles.inputLabel}>Observaciones (opcional)</Text>
+                                                <TextInput
+                                                    style={[styles.input, styles.textArea]}
+                                                    multiline
+                                                    numberOfLines={2}
+                                                    value={input.observations}
+                                                    onChangeText={text =>
+                                                        setDeliveryInputs(current => {
+                                                            const previous = current[item.id] ?? {
+                                                                quantity: '',
+                                                                lotNumber: '',
+                                                                observations: '',
+                                                            };
+                                                            return {
+                                                                ...current,
+                                                                [item.id]: { ...previous, observations: text },
+                                                            };
+                                                        })
+                                                    }
+                                                    placeholder="Notas específicas del material"
+                                                    placeholderTextColor="#9CA3AF"
+                                                />
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+
                                 <Text style={styles.inputLabel}>Evidencias fotográficas (opcional)</Text>
                                 <View style={styles.evidenceButtonsRow}>
                                     <TouchableOpacity style={styles.addImageButton} onPress={showImageOptions}>
@@ -478,6 +585,20 @@ export default function MaterialRequestDetailScreen() {
                                             ? '1 evidencia lista para enviar'
                                             : `${deliveryImages.length} evidencias listas para enviar`}
                                     </Text>
+                                )}
+
+                                {deliveryImages.length > 0 && (
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        style={styles.previewRow}
+                                    >
+                                        {deliveryImages.map((image, index) => (
+                                            <View key={`${image.uri}-${index}`} style={styles.previewItem}>
+                                                <Image source={{ uri: image.uri }} style={styles.previewImage} />
+                                            </View>
+                                        ))}
+                                    </ScrollView>
                                 )}
 
                                 {isUploadingImages && (
@@ -833,6 +954,21 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#4B5563',
         marginBottom: 8,
+    },
+    previewRow: {
+        marginBottom: 12,
+    },
+    previewItem: {
+        marginRight: 10,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        backgroundColor: '#FFFFFF',
+    },
+    previewImage: {
+        width: 88,
+        height: 88,
     },
     uploadingText: {
         fontSize: 12,

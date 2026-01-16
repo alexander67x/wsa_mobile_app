@@ -94,6 +94,21 @@ const pickArrayField = (source: Record<string, unknown>, keys: string[]): Array<
   return null;
 };
 
+const pickNestedArrayField = (
+  source: Record<string, unknown>,
+  containers: string[],
+  keys: string[],
+): Array<Record<string, unknown>> | null => {
+  for (const containerKey of containers) {
+    const container = source[containerKey];
+    if (container && typeof container === 'object') {
+      const arrayValue = pickArrayField(container as Record<string, unknown>, keys);
+      if (arrayValue) return arrayValue;
+    }
+  }
+  return null;
+};
+
 const coerceString = (value: MaybeString): string | undefined => {
   if (value === null || value === undefined) return undefined;
   const stringified = String(value).trim();
@@ -150,6 +165,17 @@ const resolveTasksCount = (project: ApiProject): number => {
       'tareas_total',
     ]);
   if (candidate !== undefined) return Math.max(0, Math.round(candidate));
+  const arrayCandidate =
+    pickArrayField(raw, ['tasks', 'tareas', 'taskList', 'lista_tareas', 'activities', 'actividades']) ??
+    pickNestedArrayField(raw, ['summary', 'resumen', 'metrics', 'stats', 'dashboard'], [
+      'tasks',
+      'tareas',
+      'taskList',
+      'lista_tareas',
+      'activities',
+      'actividades',
+    ]);
+  if (arrayCandidate) return arrayCandidate.length;
   const tasksArray = Array.isArray(project.tasks) ? project.tasks.length : undefined;
   return tasksArray ?? 0;
 };
@@ -177,6 +203,17 @@ const resolveReportsCount = (project: ApiProject): number => {
       'totalReports',
     ]);
   if (candidate !== undefined) return Math.max(0, Math.round(candidate));
+  const arrayCandidate =
+    pickArrayField(raw, ['reports', 'reportes', 'reportsList', 'lista_reportes', 'history', 'historial']) ??
+    pickNestedArrayField(raw, ['summary', 'resumen', 'metrics', 'stats', 'dashboard'], [
+      'reports',
+      'reportes',
+      'reportsList',
+      'lista_reportes',
+      'history',
+      'historial',
+    ]);
+  if (arrayCandidate) return arrayCandidate.length;
   const reportsArray = Array.isArray(project.reports) ? project.reports.length : undefined;
   return reportsArray ?? 0;
 };
@@ -218,6 +255,14 @@ const resolveTasksFromDetail = (project: ApiProjectDetail): ProjectDetail['tasks
       `task-${index}-${Date.now()}`;
     const title =
       coerceString(taskRaw.title ?? taskRaw.titulo ?? taskRaw.nombre) ?? `Tarea ${index + 1}`;
+    const description =
+      coerceString(
+        taskRaw.description ??
+          taskRaw.descripcion ??
+          taskRaw.detalle ??
+          taskRaw.detalles ??
+          taskRaw.observaciones,
+      ) ?? undefined;
     const assignee =
       coerceString(
         taskRaw.assignee ??
@@ -226,6 +271,14 @@ const resolveTasksFromDetail = (project: ApiProjectDetail): ProjectDetail['tasks
           taskRaw.asignado ??
           taskRaw.owner,
       ) ?? '';
+    const responsible =
+      coerceString(
+        taskRaw.responsable ??
+          taskRaw.responsable_nombre ??
+          taskRaw.responsableName ??
+          taskRaw.encargado ??
+          taskRaw.owner,
+      ) ?? undefined;
     const dueDate =
       coerceString(
         taskRaw.dueDate ??
@@ -234,6 +287,14 @@ const resolveTasksFromDetail = (project: ApiProjectDetail): ProjectDetail['tasks
           taskRaw.deadline ??
           taskRaw.fechaVencimiento,
       ) ?? '';
+    const startDate =
+      coerceString(taskRaw.startDate ?? taskRaw.fechaInicio ?? taskRaw.fecha_inicio) ?? undefined;
+    const endDate =
+      coerceString(taskRaw.endDate ?? taskRaw.fechaFin ?? taskRaw.fecha_fin) ?? undefined;
+    const createdAt =
+      coerceString(taskRaw.createdAt ?? taskRaw.created_at ?? taskRaw.fechaCreacion) ?? undefined;
+    const updatedAt =
+      coerceString(taskRaw.updatedAt ?? taskRaw.updated_at ?? taskRaw.fechaActualizacion) ?? undefined;
     const status = normalizeTaskStatus(
       coerceString(taskRaw.status ?? taskRaw.estado ?? taskRaw.state),
     );
@@ -243,6 +304,12 @@ const resolveTasksFromDetail = (project: ApiProjectDetail): ProjectDetail['tasks
       status,
       assignee,
       dueDate,
+      description,
+      startDate,
+      endDate,
+      createdAt,
+      updatedAt,
+      responsible,
     };
   });
 };

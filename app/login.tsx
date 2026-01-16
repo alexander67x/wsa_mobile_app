@@ -19,7 +19,7 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -31,7 +31,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const Auth = await import('@/services/auth');
-      const { token, role } = await Auth.login(username, password);
+      const { token, role } = await Auth.login(username, password, { persist: rememberMe });
       if (token) {
         await registerDevicePushToken();
         router.replace(role === 'worker' ? '/(worker)' : '/(tabs)');

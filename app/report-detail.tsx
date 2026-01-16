@@ -11,7 +11,7 @@ import type { ReportDetail as ReportDetailType } from '@/types/domain';
 
 export default function ReportDetailScreen() {
   const { reportId } = useLocalSearchParams();
-  const resolvedReportId = String(reportId || '1');
+  const resolvedReportId = reportId ? String(reportId) : '';
   const [data, setData] = useState<ReportDetailType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -22,6 +22,11 @@ export default function ReportDetailScreen() {
   const [materialsError, setMaterialsError] = useState<string[]>([]);
 
   const loadReport = useCallback(async () => {
+    if (!resolvedReportId) {
+      setData(null);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const detail = await getReport(resolvedReportId);
@@ -48,7 +53,9 @@ export default function ReportDetailScreen() {
   if (!data) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>No se pudo cargar el reporte.</Text>
+        <Text style={styles.loadingText}>
+          {resolvedReportId ? 'No se pudo cargar el reporte.' : 'Falta el id del reporte.'}
+        </Text>
       </View>
     );
   }

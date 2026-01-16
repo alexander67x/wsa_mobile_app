@@ -27,7 +27,19 @@ export interface ProjectDetail {
   manager: string;
   team: number;
   members: ProjectMember[];
-  tasks: Array<{ id: Id; title: string; status: 'pending' | 'in_progress' | 'completed'; assignee: string; dueDate: string }>;
+  tasks: Array<{
+    id: Id;
+    title: string;
+    status: 'pending' | 'in_progress' | 'completed';
+    assignee: string;
+    dueDate: string;
+    description?: string;
+    startDate?: string;
+    endDate?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    responsible?: string;
+  }>;
   reports: Array<{ id: Id; title: string; date: string; type: 'progress' | 'incident' | 'quality'; status: 'pending' | 'approved' | 'rejected' }>;
   materials: Array<{ id: Id; name: string; quantity: number; unit: string; status: 'requested' | 'approved' | 'delivered' }>;
 }

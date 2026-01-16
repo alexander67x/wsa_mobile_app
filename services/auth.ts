@@ -1,3 +1,4 @@
+import * as SecureStore from 'expo-secure-store';
 import { fetchJson } from '@/lib/http';
 
 type AuthUser = { id: string; name: string; role: 'supervisor' | 'worker'; employeeId?: string };
@@ -38,6 +39,16 @@ let memoryRole: 'supervisor' | 'worker' | null = null;
 let memoryRoleSlug: string | null = null;
 let memoryPermissions: string[] = [];
 let memoryUser: AuthUser | null = null;
+
+const SESSION_STORAGE_KEY = 'auth.session.v1';
+
+type StoredSession = {
+  token: string;
+  role: 'supervisor' | 'worker';
+  roleSlug: string | null;
+  permissions: string[];
+  user: AuthUser;
+};
 
 function extractEmployeeId(source: any): string | undefined {
   if (!source) return undefined;
@@ -86,6 +97,51 @@ function hydratePermissions(list?: string[] | null) {
 function hydrateRoleState(rolePayload: ApiRolePayload) {
   memoryRoleSlug = normalizeRoleSlug(rolePayload);
   memoryRole = mapRoleSlugToLegacy(memoryRoleSlug);
+}
+
+function hydrateSession(session: StoredSession) {
+  memoryToken = session.token;
+  memoryRole = session.role;
+  memoryRoleSlug = session.roleSlug;
+  memoryPermissions = session.permissions ?? [];
+  memoryUser = session.user;
+}
+
+async function persistSession(): Promise<void> {
+  if (!memoryToken || !memoryUser) return;
+  const session: StoredSession = {
+    token: memoryToken,
+    role: memoryRole ?? 'worker',
+    roleSlug: memoryRoleSlug,
+    permissions: memoryPermissions,
+    user: memoryUser,
+  };
+  try {
+    await SecureStore.setItemAsync(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Ignore persistence failures (device storage locked, etc.)
+  }
+}
+
+async function clearPersistedSession(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore persistence failures
+  }
+}
+
+export async function restoreSession(): Promise<{ token: string; role: 'supervisor' | 'worker' } | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as StoredSession;
+    if (!session?.token || !session.user) return null;
+    hydrateSession(session);
+    return { token: session.token, role: session.role };
+  } catch {
+    return null;
+  }
 }
 
 function unwrapAuthResponse(payload: ApiAuthResponse | null | undefined): ApiAuthResponse | null {
@@ -162,7 +218,10 @@ async function performLoginRequest(email: string, password: string): Promise<Nor
   return normalizeAuthResponse(rawResponse);
 }
 
-async function completeLoginFlow(baseResponse: NormalizedAuthResponse): Promise<{ token: string; role: 'supervisor' | 'worker'; user: { id: string; name: string; employeeId?: string } }> {
+async function completeLoginFlow(
+  baseResponse: NormalizedAuthResponse,
+  persist: boolean,
+): Promise<{ token: string; role: 'supervisor' | 'worker'; user: { id: string; name: string; employeeId?: string } }> {
   memoryToken = baseResponse.token;
   hydrateRoleState(baseResponse.role ?? null);
   hydratePermissions(baseResponse.permissions);
@@ -178,7 +237,7 @@ async function completeLoginFlow(baseResponse: NormalizedAuthResponse): Promise<
       employeeId: extractEmployeeId(me) || extractEmployeeId(baseResponse.user),
     };
 
-    return {
+    const session = {
       token: baseResponse.token,
       role: memoryRole ?? 'worker',
       user: {
@@ -187,6 +246,12 @@ async function completeLoginFlow(baseResponse: NormalizedAuthResponse): Promise<
         employeeId: memoryUser.employeeId,
       },
     };
+    if (persist) {
+      await persistSession();
+    } else {
+      await clearPersistedSession();
+    }
+    return session;
   } catch {
     const fallbackRole = memoryRole ?? 'worker';
     memoryUser = {
@@ -195,7 +260,7 @@ async function completeLoginFlow(baseResponse: NormalizedAuthResponse): Promise<
       role: fallbackRole,
       employeeId: extractEmployeeId(baseResponse.user),
     };
-    return {
+    const session = {
       token: baseResponse.token,
       role: fallbackRole,
       user: {
@@ -204,26 +269,37 @@ async function completeLoginFlow(baseResponse: NormalizedAuthResponse): Promise<
         employeeId: memoryUser.employeeId,
       },
     };
+    if (persist) {
+      await persistSession();
+    } else {
+      await clearPersistedSession();
+    }
+    return session;
   }
 }
 
-export async function login(username: string, password: string): Promise<{ token: string; role: 'supervisor' | 'worker'; user: { id: string; name: string; employeeId?: string } }>{
+export async function login(
+  username: string,
+  password: string,
+  options?: { persist?: boolean },
+): Promise<{ token: string; role: 'supervisor' | 'worker'; user: { id: string; name: string; employeeId?: string } }>{
   // Real API call - API expects 'email' but we accept username/email
   // Try username as email directly first, then try with @example.com if it doesn't contain @
   let email = username;
   if (!username.includes('@')) {
     email = `${username}@example.com`;
   }
+  const persist = options?.persist !== false;
   
   try {
     const response = await performLoginRequest(email, password);
-    return await completeLoginFlow(response);
+    return await completeLoginFlow(response, persist);
   } catch (error: any) {
     // If first attempt failed and we added @example.com, try with username as-is
     if (email !== username) {
       try {
         const response = await performLoginRequest(username, password);
-        return await completeLoginFlow(response);
+        return await completeLoginFlow(response, persist);
       } catch (e) {
         // Fall through to throw original error
       }
@@ -260,6 +336,7 @@ export async function logout(): Promise<void> {
   memoryRoleSlug = null;
   memoryPermissions = [];
   memoryUser = null;
+  await clearPersistedSession();
 }
 
 export function getToken(): string | null {

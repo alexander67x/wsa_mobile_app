@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Clock, Play, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -107,12 +107,14 @@ export default function KanbanBoardScreen({
   const [board, setBoard] = useState<KanbanBoard>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadBoard = useCallback(async () => {
     if (!projectId && requireProject) {
       setLoading(false);
       setBoard({});
       setError('Selecciona un proyecto para ver su tablero.');
+      setIsRefreshing(false);
       return;
     }
     try {
@@ -126,6 +128,7 @@ export default function KanbanBoardScreen({
       setBoard({});
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, [projectId, requireProject]);
 
@@ -264,13 +267,23 @@ export default function KanbanBoardScreen({
         const nested = toOptionalString(
           (taskProject as { id?: string | number }).id ??
           (taskProject as { projectId?: string | number }).projectId ??
-          (taskProject as { project_id?: string | number }).project_id
+          (taskProject as { project_id?: string | number }).project_id ??
+          (taskProject as { proyectoId?: string | number }).proyectoId ??
+          (taskProject as { proyecto_id?: string | number }).proyecto_id ??
+          (taskProject as { id_proyecto?: string | number }).id_proyecto ??
+          (taskProject as { cod_proy?: string | number }).cod_proy ??
+          (taskProject as { cod_proyecto?: string | number }).cod_proyecto
         );
         if (nested) return nested;
       }
       const directTaskProjectId = toOptionalString(
         (task as { projectId?: string | number }).projectId ??
-        (task as { project_id?: string | number }).project_id
+        (task as { project_id?: string | number }).project_id ??
+        (task as { proyectoId?: string | number }).proyectoId ??
+        (task as { proyecto_id?: string | number }).proyecto_id ??
+        (task as { id_proyecto?: string | number }).id_proyecto ??
+        (task as { cod_proy?: string | number }).cod_proy ??
+        (task as { cod_proyecto?: string | number }).cod_proyecto
       );
       if (directTaskProjectId) return directTaskProjectId;
     }
@@ -280,7 +293,12 @@ export default function KanbanBoardScreen({
       const nested = toOptionalString(
         (directProject as { id?: string | number }).id ??
         (directProject as { projectId?: string | number }).projectId ??
-        (directProject as { project_id?: string | number }).project_id
+        (directProject as { project_id?: string | number }).project_id ??
+        (directProject as { proyectoId?: string | number }).proyectoId ??
+        (directProject as { proyecto_id?: string | number }).proyecto_id ??
+        (directProject as { id_proyecto?: string | number }).id_proyecto ??
+        (directProject as { cod_proy?: string | number }).cod_proy ??
+        (directProject as { cod_proyecto?: string | number }).cod_proyecto
       );
       if (nested) return nested;
     }
@@ -289,8 +307,18 @@ export default function KanbanBoardScreen({
       toOptionalString(card.projectId) ??
       toOptionalString((card as any).projectId) ??
       toOptionalString((card as any).project_id) ??
+      toOptionalString((card as any).proyectoId) ??
+      toOptionalString((card as any).proyecto_id) ??
+      toOptionalString((card as any).id_proyecto) ??
+      toOptionalString((card as any).cod_proy) ??
+      toOptionalString((card as any).cod_proyecto) ??
       toOptionalString((card.metadata as { projectId?: string | number })?.projectId) ??
-      toOptionalString((card.metadata as { project_id?: string | number })?.project_id);
+      toOptionalString((card.metadata as { project_id?: string | number })?.project_id) ??
+      toOptionalString((card.metadata as { proyectoId?: string | number })?.proyectoId) ??
+      toOptionalString((card.metadata as { proyecto_id?: string | number })?.proyecto_id) ??
+      toOptionalString((card.metadata as { id_proyecto?: string | number })?.id_proyecto) ??
+      toOptionalString((card.metadata as { cod_proy?: string | number })?.cod_proy) ??
+      toOptionalString((card.metadata as { cod_proyecto?: string | number })?.cod_proyecto);
 
     if (resolved) return resolved;
     return fallback;
@@ -302,12 +330,37 @@ export default function KanbanBoardScreen({
       const nestedTaskId = toOptionalString(
         (task as { id?: string | number }).id ??
         (task as { taskId?: string | number }).taskId ??
-        (task as { task_id?: string | number }).task_id
+        (task as { task_id?: string | number }).task_id ??
+        (task as { tareaId?: string | number }).tareaId ??
+        (task as { tarea_id?: string | number }).tarea_id ??
+        (task as { id_tarea?: string | number }).id_tarea ??
+        (task as { cod_tarea?: string | number }).cod_tarea ??
+        (task as { codigo?: string | number }).codigo ??
+        (task as { taskCode?: string | number }).taskCode ??
+        (task as { task_code?: string | number }).task_code
       );
       if (nestedTaskId) return nestedTaskId;
     }
     const directId = toOptionalString(
-      card.taskId ?? (card as any).taskId ?? (card as any).task_id ?? (card.metadata as { taskId?: string | number })?.taskId
+      card.taskId ??
+        (card as any).taskId ??
+        (card as any).task_id ??
+        (card as any).tareaId ??
+        (card as any).tarea_id ??
+        (card as any).id_tarea ??
+        (card as any).cod_tarea ??
+        (card as any).codigo ??
+        (card as any).taskCode ??
+        (card as any).task_code ??
+        (card.metadata as { taskId?: string | number })?.taskId ??
+        (card.metadata as { task_id?: string | number })?.task_id ??
+        (card.metadata as { tareaId?: string | number })?.tareaId ??
+        (card.metadata as { tarea_id?: string | number })?.tarea_id ??
+        (card.metadata as { id_tarea?: string | number })?.id_tarea ??
+        (card.metadata as { cod_tarea?: string | number })?.cod_tarea ??
+        (card.metadata as { codigo?: string | number })?.codigo ??
+        (card.metadata as { taskCode?: string | number })?.taskCode ??
+        (card.metadata as { task_code?: string | number })?.task_code
     );
     if (directId) return directId;
     return toOptionalString(card.id);
@@ -320,7 +373,10 @@ export default function KanbanBoardScreen({
       Alert.alert('Sin detalles disponibles', 'No se encontro informacion suficiente de la tarea.');
       return;
     }
-    router.push({ pathname: '/task-detail', params: { projectId: resolvedProjectId, taskId } });
+    router.push({
+      pathname: '/task-detail',
+      params: { projectId: resolvedProjectId, taskId, fromKanban: 'true' },
+    });
   };
 
   const renderColumn = (column: ColumnKey) => {
@@ -389,7 +445,22 @@ export default function KanbanBoardScreen({
             </TouchableOpacity>
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kanbanBoard}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.kanbanBoard}
+            refreshControl={(
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => {
+                  setIsRefreshing(true);
+                  loadBoard();
+                }}
+                tintColor={COLORS.primary}
+                colors={[COLORS.primary]}
+              />
+            )}
+          >
             {columns.map(column => renderColumn(column))}
           </ScrollView>
         )}
