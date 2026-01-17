@@ -198,7 +198,12 @@ export default function ReportsScreen() {
             const statusInfo = getIncidentStatusInfo(incident.status);
             const severityInfo = getSeverityInfo(incident.severity);
             return (
-              <View key={incident.id} style={styles.reportCard}>
+              <TouchableOpacity
+                key={incident.id}
+                style={styles.reportCard}
+                activeOpacity={0.85}
+                onPress={() => router.push({ pathname: '/incident-detail', params: { incidentId: incident.id } })}
+              >
                 <View style={styles.reportHeader}>
                   <View style={styles.typeContainer}>
                     <AlertTriangle size={20} color={severityInfo.color} />
@@ -234,7 +239,7 @@ export default function ReportsScreen() {
                     <Text style={styles.dateText}>{incident.date || 'Sin fecha'}</Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         ) : (

@@ -5,11 +5,28 @@ import { ArrowLeft } from 'lucide-react-native';
 import { getCard } from '@/services/kanban';
 import type { KanbanCard } from '@/types/domain';
 import { COLORS } from '@/theme';
+import ReportDetailScreen from '../report-detail';
 
 export default function WorkerReportDetail() {
-  const { cardId } = useLocalSearchParams<{ cardId: string }>();
+  const { cardId, reportId } = useLocalSearchParams<{ cardId?: string; reportId?: string }>();
+  if (reportId) {
+    return <ReportDetailScreen />;
+  }
   const [card, setCard] = useState<KanbanCard | null>(null);
-  useEffect(() => { if (cardId) getCard(String(cardId)).then(setCard).catch(() => setCard(null)); }, [cardId]);
+  const resolvedCardId = cardId ? String(cardId) : '';
+
+  useEffect(() => {
+    if (!resolvedCardId) return;
+    getCard(resolvedCardId).then(setCard).catch(() => setCard(null));
+  }, [resolvedCardId]);
+
+  if (!resolvedCardId) {
+    return (
+      <View style={styles.center}>
+        <Text>Falta el id del reporte.</Text>
+      </View>
+    );
+  }
 
   if (!card) return <View style={styles.center}><Text>Cargando...</Text></View>;
 
