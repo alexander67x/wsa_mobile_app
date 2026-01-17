@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Clock, Play, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Kanban from '@/services/kanban';
@@ -132,9 +132,11 @@ export default function KanbanBoardScreen({
     }
   }, [projectId, requireProject]);
 
-  useEffect(() => {
-    loadBoard();
-  }, [loadBoard]);
+  useFocusEffect(
+    useCallback(() => {
+      loadBoard();
+    }, [loadBoard])
+  );
 
   const groupedBoard = useMemo(() => groupBoard(board), [board]);
   const columns = DEFAULT_COLUMNS;
