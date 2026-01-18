@@ -70,10 +70,23 @@ function extractEmployeeId(source: any): string | undefined {
   return Number.isFinite(asNumber) ? String(asNumber) : String(raw);
 }
 
+const SUPERVISOR_SLUGS = new Set([
+  'adquisiciones',
+  'gerencia',
+  'responsable_proyecto',
+  'supervisor',
+  'supervisor_de_obra',
+  'supervisor_obra',
+]);
+
+export function isSupervisorRoleSlug(slug: string | null | undefined): boolean {
+  if (!slug) return false;
+  return SUPERVISOR_SLUGS.has(String(slug).trim().toLowerCase());
+}
+
 function mapRoleSlugToLegacy(slug: string | null): 'supervisor' | 'worker' {
   if (!slug) return 'worker';
-  const supervisorSlugs = ['adquisiciones', 'gerencia', 'responsable_proyecto', 'supervisor'];
-  return supervisorSlugs.includes(slug) ? 'supervisor' : 'worker';
+  return isSupervisorRoleSlug(slug) ? 'supervisor' : 'worker';
 }
 
 function normalizeRoleSlug(role: ApiRolePayload): string | null {

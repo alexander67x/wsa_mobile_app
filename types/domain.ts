@@ -58,6 +58,7 @@ export interface Report {
   type: 'progress' | 'incident' | 'quality';
   status: 'pending' | 'approved' | 'rejected';
   progress?: number;
+  materialsUsed?: string;
   authorId?: Id;
   authorName?: string;
 }
@@ -66,6 +67,7 @@ export interface ReportDetail {
   id: Id;
   title: string;
   project: string;
+  projectId?: Id;
   type: 'progress' | 'incident' | 'quality';
   status: 'pending' | 'approved' | 'rejected';
   progress?: number;
@@ -81,6 +83,19 @@ export interface ReportDetail {
   rejectedBy?: string;
   rejectedDate?: string;
   feedback?: string;
+  taskId?: Id;
+  taskTitle?: string;
+  taskDescription?: string;
+  taskStatus?: string;
+  difficulties?: string;
+  materialsUsed?: string;
+  materials?: Array<{
+    materialId: Id;
+    materialName?: string;
+    quantity: number;
+    unit: string;
+    observations?: string;
+  }>;
 }
 
 export type MaterialRequestStatus =

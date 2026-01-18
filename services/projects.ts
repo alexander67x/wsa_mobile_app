@@ -222,7 +222,16 @@ const normalizeTaskStatus = (status?: string): 'pending' | 'in_progress' | 'comp
   const normalized = status?.toLowerCase();
   if (!normalized) return 'pending';
   if (normalized.includes('progress') || normalized.includes('proceso')) return 'in_progress';
-  if (normalized.includes('complet')) return 'completed';
+  if (
+    normalized.includes('complet') ||
+    normalized.includes('final') ||
+    normalized.includes('terminad') ||
+    normalized.includes('done') ||
+    normalized.includes('closed') ||
+    normalized.includes('cerrad')
+  ) {
+    return 'completed';
+  }
   return 'pending';
 };
 

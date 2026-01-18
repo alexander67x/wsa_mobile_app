@@ -8,6 +8,7 @@ import {
   MaterialRequestStatus,
 } from '@/types/domain';
 import { getMyProjects } from '@/services/projects';
+import { getRoleSlug, isSupervisorRoleSlug } from '@/services/auth';
 
 interface ApiCatalogItem {
   id: number | string;
@@ -431,12 +432,57 @@ const mapMaterialRequestDetail = (request: ApiMaterialRequest): MaterialRequestD
 export interface ListMaterialRequestsParams {
   projectId?: string;
   status?: MaterialRequestStatus;
+  requiereCompra?: boolean;
 }
 
 export async function listMaterialRequests(params: ListMaterialRequestsParams = {}): Promise<MaterialRequest[]> {
+  const roleSlug = getRoleSlug();
+  const isSupervisorRole = isSupervisorRoleSlug(roleSlug);
+
+  if (!params.projectId && isSupervisorRole) {
+    try {
+      const myProjects = await getMyProjects();
+      if (myProjects.length > 0) {
+        console.log('[materials] supervisor projects', myProjects.map(project => project.id));
+        const requestsByProject = await Promise.all(
+          myProjects.map(project => {
+            const projectQuery = new URLSearchParams();
+            projectQuery.append('projectId', project.id);
+            if (params.status) projectQuery.append('estado', params.status);
+            if (params.requiereCompra !== undefined) {
+              projectQuery.append('requiereCompra', String(params.requiereCompra));
+            }
+            const url = `/materials/requests?${projectQuery.toString()}`;
+            console.log('[materials] fetching', url);
+            return fetchJson<ApiMaterialRequest[]>(url).catch(error => {
+              console.error('[materials] request failed', url, error);
+              throw error;
+            });
+          })
+        );
+
+        const deduped = new Map<string, ApiMaterialRequest>();
+        for (const list of requestsByProject) {
+          for (const request of list) {
+            const requestId = request.id != null ? normalizeId(request.id) : '';
+            if (!requestId) continue;
+            if (!deduped.has(requestId)) deduped.set(requestId, request);
+          }
+        }
+
+        return Array.from(deduped.values()).map(mapMaterialRequest);
+      }
+    } catch (error) {
+      console.error('Error loading material requests by projects:', error);
+    }
+  }
+
   const query = new URLSearchParams();
   if (params.projectId) query.append('projectId', params.projectId);
-  if (params.status) query.append('status', params.status);
+  if (params.status) query.append('estado', params.status);
+  if (params.requiereCompra !== undefined) {
+    query.append('requiereCompra', String(params.requiereCompra));
+  }
   const queryString = query.toString();
 
   const apiRequests = await fetchJson<ApiMaterialRequest[]>(
@@ -540,6 +586,26 @@ export async function deliverMaterialRequest(
   return mapMaterialRequestDetail(apiRequest);
 }
 
+type ApiCatalogResponse =
+  | ApiCatalogItem[]
+  | {
+      materials?: ApiCatalogItem[];
+      catalog?: ApiCatalogItem[];
+      items?: ApiCatalogItem[];
+      warehouse?: Record<string, unknown> | null;
+      almacen?: Record<string, unknown> | null;
+    };
+
+const resolveCatalogItems = (payload: ApiCatalogResponse): ApiCatalogItem[] => {
+  if (Array.isArray(payload)) return payload;
+  return (
+    payload.materials ??
+    payload.catalog ??
+    payload.items ??
+    []
+  );
+};
+
 export async function listCatalog(projectId?: string): Promise<CatalogItem[]> {
   // Build URL with projectId as query parameter if provided
   let url = '/materials/catalog';
@@ -547,9 +613,16 @@ export async function listCatalog(projectId?: string): Promise<CatalogItem[]> {
     url += `?projectId=${encodeURIComponent(projectId)}`;
   }
 
-  const apiCatalog = await fetchJson<ApiCatalogItem[]>(url);
+  const apiCatalog = await fetchJson<ApiCatalogResponse>(url);
+  if (!Array.isArray(apiCatalog)) {
+    const warehouse = apiCatalog.warehouse ?? apiCatalog.almacen ?? null;
+    if (warehouse) {
+      console.log('[materials] catalog warehouse', warehouse);
+    }
+  }
+  const catalogItems = resolveCatalogItems(apiCatalog);
 
-  return apiCatalog.map((item): CatalogItem => ({
+  return catalogItems.map((item): CatalogItem => ({
     id: String(item.id),
     name: item.name,
     unit: item.unit,

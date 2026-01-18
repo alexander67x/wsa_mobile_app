@@ -10,7 +10,7 @@ import { getRoleSlug } from '@/services/auth';
 
 export default function SelectProjectTypeScreen() {
   const roleSlug = getRoleSlug();
-  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto' || roleSlug === 'supervisor';
+  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto';
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<'report' | 'incident' | null>(isIncidentOnlyRole ? 'incident' : null);

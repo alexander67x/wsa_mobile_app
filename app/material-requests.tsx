@@ -64,6 +64,7 @@ export default function MaterialsScreen() {
       loadRequests();
     }, [loadRequests])
   );
+  
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);

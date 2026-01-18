@@ -32,6 +32,9 @@ type KanbanBoardProps = {
 const DEFAULT_COLUMNS = ['pending', 'review', 'completed'] as const;
 type ColumnKey = typeof DEFAULT_COLUMNS[number];
 
+const TASK_LIST_KEYS = ['tareas', 'tasks', 'tasksforproject', 'tasks_for_project'];
+const EXPLICIT_TASK_COLUMNS = ['pendiente', 'revision', 'finalizada'];
+
 const normalizeKey = (value?: string | null): string => {
   if (!value) return '';
   return value
@@ -64,12 +67,137 @@ const mapColumnToLane = (value: string): ColumnKey => {
   return 'pending';
 };
 
+const toOptionalString = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  const str = String(value).trim();
+  return str.length ? str : undefined;
+};
+
+const asTaskObject = (card: ExtendedKanbanCard): Record<string, unknown> | undefined => {
+  const task = card.task;
+  return task && typeof task === 'object' ? task : undefined;
+};
+
+const resolveTaskIdFromValue = (value: Record<string, unknown> | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  return toOptionalString(
+    value.id ??
+      value.taskId ??
+      value.task_id ??
+      value.tareaId ??
+      value.tarea_id ??
+      value.id_tarea ??
+      value.cod_tarea ??
+      value.codigo ??
+      value.taskCode ??
+      value.task_code
+  );
+};
+
+const resolveTaskStatusValue = (value: Record<string, unknown> | null | undefined): string => {
+  if (!value) return '';
+  return String(value.status ?? value.estado ?? value.state ?? '').toLowerCase();
+};
+
+const isTaskCompleted = (status: string): boolean => {
+  const normalized = status.toLowerCase();
+  return (
+    normalized.includes('finaliz') ||
+    normalized.includes('complet') ||
+    normalized.includes('terminad') ||
+    normalized.includes('done') ||
+    normalized.includes('closed') ||
+    normalized.includes('cerrad')
+  );
+};
+
+const resolveTaskTitle = (value: Record<string, unknown> | null | undefined, fallback: string): string => {
+  if (!value) return fallback;
+  return (
+    toOptionalString(value.title) ??
+    toOptionalString(value.titulo) ??
+    toOptionalString(value.nombre) ??
+    fallback
+  );
+};
+
+const getTaskListFromBoard = (rawBoard: KanbanBoard): Array<Record<string, unknown>> | null => {
+  if (!rawBoard) return null;
+  for (const [columnName, cards] of Object.entries(rawBoard)) {
+    const normalized = normalizeKey(columnName);
+    if (TASK_LIST_KEYS.includes(normalized) && Array.isArray(cards)) {
+      return cards as Array<Record<string, unknown>>;
+    }
+  }
+  return null;
+};
+
+const collectReportTaskIds = (rawBoard: KanbanBoard): Set<string> => {
+  const reportTaskIds = new Set<string>();
+  Object.entries(rawBoard || {}).forEach(([columnName, cards]) => {
+    const normalized = normalizeKey(columnName);
+    if (TASK_LIST_KEYS.includes(normalized)) return;
+    (cards || []).forEach(card => {
+      const value = card as Record<string, unknown>;
+      const task =
+        (value.task as Record<string, unknown> | null | undefined) ??
+        (value.tarea as Record<string, unknown> | null | undefined);
+      const taskId =
+        resolveTaskIdFromValue(task) ??
+        resolveTaskIdFromValue(value) ??
+        resolveTaskIdFromValue(value.metadata as Record<string, unknown> | null | undefined);
+      if (!taskId) return;
+      reportTaskIds.add(taskId);
+    });
+  });
+  return reportTaskIds;
+};
+
+const hasExplicitTaskColumns = (rawBoard: KanbanBoard): boolean => {
+  if (!rawBoard) return false;
+  return Object.keys(rawBoard).some(key => EXPLICIT_TASK_COLUMNS.includes(normalizeKey(key)));
+};
+
 const groupBoard = (rawBoard: KanbanBoard): Record<ColumnKey, ExtendedKanbanCard[]> => {
   const grouped: Record<ColumnKey, ExtendedKanbanCard[]> = {
     pending: [],
     review: [],
     completed: [],
   };
+
+  if (hasExplicitTaskColumns(rawBoard)) {
+    Object.entries(rawBoard || {}).forEach(([columnName, cards]) => {
+      if (!EXPLICIT_TASK_COLUMNS.includes(normalizeKey(columnName))) return;
+      const lane = mapColumnToLane(columnName);
+      (cards || []).forEach(card => grouped[lane].push(card as ExtendedKanbanCard));
+    });
+    return grouped;
+  }
+
+  const tasksList = getTaskListFromBoard(rawBoard);
+  if (tasksList) {
+    const reportTaskIds = collectReportTaskIds(rawBoard);
+    tasksList.forEach((task, index) => {
+      const taskId = resolveTaskIdFromValue(task) ?? `task-${index}-${Date.now()}`;
+      const status = resolveTaskStatusValue(task);
+      const card: ExtendedKanbanCard = {
+        id: taskId,
+        title: resolveTaskTitle(task, `Tarea ${index + 1}`),
+        task: task as Record<string, unknown>,
+        taskId,
+        status,
+      };
+
+      if (isTaskCompleted(status)) {
+        grouped.completed.push(card);
+      } else if (reportTaskIds.has(taskId)) {
+        grouped.review.push(card);
+      } else {
+        grouped.pending.push(card);
+      }
+    });
+    return grouped;
+  }
 
   Object.entries(rawBoard || {}).forEach(([columnName, cards]) => {
     (cards || []).forEach(card => {
@@ -85,17 +213,6 @@ const groupBoard = (rawBoard: KanbanBoard): Record<ColumnKey, ExtendedKanbanCard
   });
 
   return grouped;
-};
-
-const toOptionalString = (value: unknown): string | undefined => {
-  if (value === undefined || value === null) return undefined;
-  const str = String(value).trim();
-  return str.length ? str : undefined;
-};
-
-const asTaskObject = (card: ExtendedKanbanCard): Record<string, unknown> | undefined => {
-  const task = card.task;
-  return task && typeof task === 'object' ? task : undefined;
 };
 
 export default function KanbanBoardScreen({
@@ -135,6 +252,12 @@ export default function KanbanBoardScreen({
   useFocusEffect(
     useCallback(() => {
       loadBoard();
+      const intervalId = setInterval(() => {
+        loadBoard();
+      }, 30000);
+      return () => {
+        clearInterval(intervalId);
+      };
     }, [loadBoard])
   );
 
@@ -468,23 +591,6 @@ export default function KanbanBoardScreen({
         )}
       </View>
 
-      <View style={styles.legendContainer}>
-        <Text style={styles.legendTitle}>Prioridades:</Text>
-        <View style={styles.legendItems}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#EF4444' }]} />
-            <Text style={styles.legendText}>Alta</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#F59E0B' }]} />
-            <Text style={styles.legendText}>Media</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#10B981' }]} />
-            <Text style={styles.legendText}>Baja</Text>
-          </View>
-        </View>
-      </View>
     </View>
   );
 }
@@ -515,10 +621,4 @@ const styles = StyleSheet.create({
   centerText: { marginTop: 8, color: '#6B7280', textAlign: 'center' },
   retryButton: { marginTop: 12, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: COLORS.primary },
   retryText: { color: '#FFFFFF', fontWeight: '600' },
-  legendContainer: { padding: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E5E7EB' },
-  legendTitle: { fontWeight: '700', color: '#111827' },
-  legendItems: { flexDirection: 'row', marginTop: 8 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
-  legendColor: { width: 12, height: 12, borderRadius: 6, marginRight: 6 },
-  legendText: { color: '#6B7280' },
 });

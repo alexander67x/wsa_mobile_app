@@ -6,9 +6,9 @@ import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { getProject } from '@/services/projects';
-import { createReport, type ReportImage, type ReportMaterial } from '@/services/reports';
+import { createReport, getReport, resubmitReport, type ReportImage, type ReportMaterial } from '@/services/reports';
 import { createIncident, type IncidentImage } from '@/services/incidencias';
-import { getUser, getRoleSlug } from '@/services/auth';
+import { getUser, getRoleSlug, isSupervisorRoleSlug } from '@/services/auth';
 import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { listCatalog } from '@/services/materials';
 import type { ProjectDetail } from '@/types/domain';
@@ -36,11 +36,27 @@ const reportTypes = [
 ];
 
 export default function CreateReportScreen() {
-  const { projectId, taskId, sendAsIncident: sendAsIncidentParam } = useLocalSearchParams();
+  const params = useLocalSearchParams<{
+    projectId?: string | string[];
+    taskId?: string | string[];
+    reportId?: string | string[];
+    sendAsIncident?: string;
+  }>();
+  const normalizeParam = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value);
+  const initialProjectId = normalizeParam(params.projectId);
+  const initialTaskId = normalizeParam(params.taskId);
+  const resubmitReportId = normalizeParam(params.reportId);
+  const sendAsIncidentParam = params.sendAsIncident;
   const roleSlug = getRoleSlug();
-  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto' || roleSlug === 'supervisor';
+  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto';
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
+  const [resolvedProjectId, setResolvedProjectId] = useState<string | undefined>(
+    initialProjectId ? String(initialProjectId) : undefined
+  );
+  const [resolvedTaskId, setResolvedTaskId] = useState<string | undefined>(
+    initialTaskId ? String(initialTaskId) : undefined
+  );
   const [reportType, setReportType] = useState('progress');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -55,15 +71,18 @@ export default function CreateReportScreen() {
   const [materialQuantity, setMaterialQuantity] = useState('');
   const [materialObservations, setMaterialObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [sendAsIncident, setSendAsIncident] = useState(
     isIncidentOnlyRole ? true : sendAsIncidentParam === 'true',
   );
   const [incidentType, setIncidentType] = useState<'falla_equipos' | 'accidente' | 'retraso_material' | 'problema_calidad' | 'otro'>('otro');
   const [incidentSeverity, setIncidentSeverity] = useState<'critica' | 'alta' | 'media' | 'baja'>('media');
-  const isReportCreationRestricted = isIncidentOnlyRole && !sendAsIncident;
+  const isResubmitting = Boolean(resubmitReportId);
+  const isReportCreationRestricted = !isResubmitting && isIncidentOnlyRole && !sendAsIncident;
   const saveButtonDisabled = isSubmitting || isReportCreationRestricted;
+  const isLoading = isLoadingProject || isLoadingReport;
 
   const handleToggleChange = (value: boolean) => {
     setSendAsIncident(value);
@@ -81,10 +100,45 @@ export default function CreateReportScreen() {
   };
 
   useEffect(() => {
-    if (isIncidentOnlyRole && !sendAsIncident) {
+    if (!isResubmitting && isIncidentOnlyRole && !sendAsIncident) {
       handleToggleChange(true);
     }
-  }, [isIncidentOnlyRole, sendAsIncident]);
+  }, [isResubmitting, isIncidentOnlyRole, sendAsIncident]);
+
+  useEffect(() => {
+    if (!resubmitReportId) return;
+    setIsLoadingReport(true);
+    (async () => {
+      try {
+        const report = await getReport(String(resubmitReportId));
+        setTitle(report.title || '');
+        setDescription(report.description || '');
+        setDifficulties(report.difficulties || '');
+        setObservations(report.observations || '');
+        setSendAsIncident(false);
+        if (report.projectId) setResolvedProjectId(String(report.projectId));
+        if (report.taskId) setResolvedTaskId(String(report.taskId));
+        if (report.images?.length) {
+          const now = new Date().toISOString();
+          setImages(report.images.map((uri) => ({ uri, takenAt: now })));
+        }
+        if (report.materials?.length) {
+          setSelectedMaterials(report.materials.map(material => ({
+            materialId: material.materialId,
+            materialName: material.materialName || 'Material',
+            quantity: String(material.quantity ?? ''),
+            unit: material.unit || '',
+            observations: material.observations || '',
+          })));
+        }
+      } catch (error) {
+        console.error('Error loading report for resubmit:', error);
+        Alert.alert('Error', 'No se pudo cargar el reporte para reenviar.');
+      } finally {
+        setIsLoadingReport(false);
+      }
+    })();
+  }, [resubmitReportId]);
 
   useEffect(() => {
     // Request camera, media library and location permissions
@@ -108,16 +162,17 @@ export default function CreateReportScreen() {
       }
     })();
 
-    if (projectId) {
-      getProject(String(projectId))
+    if (resolvedProjectId) {
+      setIsLoadingProject(true);
+      getProject(String(resolvedProjectId))
         .then((projectData) => {
           setProject(projectData);
-          if (taskId) {
-            const foundTask = projectData.tasks.find(t => t.id === String(taskId));
+          if (resolvedTaskId) {
+            const foundTask = projectData.tasks.find(t => t.id === String(resolvedTaskId));
             if (foundTask) {
               setTask(foundTask);
               // Pre-llenar el título con el nombre de la tarea
-              if (!sendAsIncident && !sendAsIncidentParam) {
+              if (!isResubmitting && !sendAsIncident && !sendAsIncidentParam && !title) {
                 setTitle(`Reporte de avance: ${foundTask.title}`);
               }
             }
@@ -127,13 +182,14 @@ export default function CreateReportScreen() {
           console.error('Error loading project:', error);
           Alert.alert('Error', 'No se pudo cargar la información del proyecto');
         })
-        .finally(() => setIsLoading(false));
+        .finally(() => setIsLoadingProject(false));
 
       // Load catalog materials with projectId
       setIsLoadingCatalog(true);
-      listCatalog(String(projectId))
+      listCatalog(String(resolvedProjectId))
         .then((materials) => {
           setCatalogMaterials(materials || []);
+          console.log('[create-report] catalog materials', materials);
           if (materials.length > 0) {
             setSelectedMaterialForAdd(materials[0].id);
           }
@@ -144,9 +200,9 @@ export default function CreateReportScreen() {
         })
         .finally(() => setIsLoadingCatalog(false));
     } else {
-      setIsLoading(false);
+      setIsLoadingProject(false);
     }
-  }, [projectId, taskId]);
+  }, [resolvedProjectId, resolvedTaskId, sendAsIncident, sendAsIncidentParam, isResubmitting]);
 
   const pickImage = async () => {
     try {
@@ -239,6 +295,10 @@ export default function CreateReportScreen() {
   };
 
   const openMaterialModal = () => {
+    if (isLoadingCatalog) {
+      Alert.alert('Cargando catálogo', 'Espera un momento mientras se cargan los materiales.');
+      return;
+    }
     if (catalogMaterials.length === 0) {
       Alert.alert('Sin materiales', 'No hay materiales disponibles en el catálogo');
       return;
@@ -324,12 +384,25 @@ export default function CreateReportScreen() {
     );
   };
 
+  const buildMaterialsUsed = () => {
+    if (selectedMaterials.length === 0) return 'Sin materiales reportados';
+    return selectedMaterials
+      .map(material => {
+        const qty = material.quantity ? `${material.quantity} ${material.unit}`.trim() : '';
+        const notes = material.observations ? ` (${material.observations})` : '';
+        return `${material.materialName}${qty ? ` - ${qty}` : ''}${notes}`;
+      })
+      .join(', ');
+  };
+
   const handleSave = async () => {
     if (isReportCreationRestricted) {
       Alert.alert('Acceso restringido', 'No tienes permisos para crear reportes de avance.');
       return;
     }
-    if (!projectId) {
+    const projectIdValue = resolvedProjectId;
+    const taskIdValue = resolvedTaskId;
+    if (!projectIdValue) {
       Alert.alert('Error', 'Faltan parámetros necesarios (proyecto)');
       return;
     }
@@ -379,8 +452,12 @@ export default function CreateReportScreen() {
 
       let reportImages: ReportImage[] = [];
 
+      const isRemoteImage = (uri: string) => /^https?:\/\//i.test(uri);
+      const remoteImages = images.filter(img => isRemoteImage(img.uri));
+      const localImages = images.filter(img => !isRemoteImage(img.uri));
+
       // Upload images to Cloudinary first if there are any
-      if (images.length > 0) {
+      if (localImages.length > 0 || remoteImages.length > 0) {
         if (!deviceLocation) {
           Alert.alert(
             'Ubicación requerida',
@@ -395,16 +472,26 @@ export default function CreateReportScreen() {
 
         setIsUploadingImages(true);
         try {
-          const imageUris = images.map(img => img.uri);
-          const imageUrls = await uploadImagesToCloudinary(imageUris, 'reports');
+          let uploadedUrls: string[] = [];
+          if (localImages.length > 0) {
+            const imageUris = localImages.map(img => img.uri);
+            uploadedUrls = await uploadImagesToCloudinary(imageUris, 'reports');
+          }
           
           // Map uploaded URLs with location and timestamps
-          reportImages = imageUrls.map((url, index) => ({
+          const uploadedImages = uploadedUrls.map((url, index) => ({
             url,
             latitude: deviceLocation!.latitude,
             longitude: deviceLocation!.longitude,
-            takenAt: images[index].takenAt,
+            takenAt: localImages[index]?.takenAt,
           }));
+          const existingImages = remoteImages.map((image) => ({
+            url: image.uri,
+            latitude: deviceLocation!.latitude,
+            longitude: deviceLocation!.longitude,
+            takenAt: image.takenAt,
+          }));
+          reportImages = [...existingImages, ...uploadedImages];
         } catch (uploadError: any) {
           console.error('Error uploading images:', uploadError);
           Alert.alert(
@@ -433,8 +520,8 @@ export default function CreateReportScreen() {
         }));
 
         await createIncident({
-          projectId: String(projectId),
-          taskId: taskId ? (Number(taskId) || String(taskId)) : undefined,
+          projectId: String(projectIdValue),
+          taskId: taskIdValue ? (Number(taskIdValue) || String(taskIdValue)) : undefined,
           authorId: Number(authorId) || String(authorId),
           title,
           description,
@@ -449,11 +536,11 @@ export default function CreateReportScreen() {
           'Éxito',
           'Incidencia creada correctamente',
           [
-            ...(taskId ? [{
+            ...(taskIdValue ? [{
               text: 'Ver Tarea',
               onPress: () => router.push({
                 pathname: '/task-detail',
-                params: { projectId: String(projectId), taskId: String(taskId) }
+                params: { projectId: String(projectIdValue), taskId: String(taskIdValue) }
               }),
             }] : []),
             {
@@ -472,27 +559,64 @@ export default function CreateReportScreen() {
           observations: m.observations || undefined,
         }));
 
-        await createReport({
-          projectId: String(projectId),
-          taskId: taskId ? (Number(taskId) || String(taskId)) : undefined,
-          authorId: Number(authorId) || String(authorId),
-          title,
-          description,
-          difficulties: difficulties || undefined,
-          observations: observations || undefined,
-          images: reportImages.length > 0 ? reportImages : undefined,
-          materials: reportMaterials.length > 0 ? reportMaterials : undefined,
-        });
+        if (isResubmitting && resubmitReportId) {
+          const materialsUsed = buildMaterialsUsed();
+          console.log('[create-report] resubmit payload', {
+            reportId: String(resubmitReportId),
+            title,
+            description,
+            difficulties: difficulties || undefined,
+            materialsUsed,
+            observations: observations || undefined,
+            images: reportImages.length > 0 ? reportImages : undefined,
+            materials: reportMaterials.length > 0 ? reportMaterials : undefined,
+          });
+          await resubmitReport(String(resubmitReportId), {
+            title,
+            description,
+            difficulties: difficulties || undefined,
+            materialsUsed,
+            observations: observations || undefined,
+            images: reportImages.length > 0 ? reportImages : undefined,
+            materials: reportMaterials.length > 0 ? reportMaterials : undefined,
+          });
+        } else {
+          const materialsUsed = buildMaterialsUsed();
+          console.log('[create-report] create payload', {
+            projectId: String(projectIdValue),
+            taskId: taskIdValue ? (Number(taskIdValue) || String(taskIdValue)) : undefined,
+            authorId: Number(authorId) || String(authorId),
+            title,
+            description,
+            difficulties: difficulties || undefined,
+            materialsUsed,
+            observations: observations || undefined,
+            images: reportImages.length > 0 ? reportImages : undefined,
+            materials: reportMaterials.length > 0 ? reportMaterials : undefined,
+          });
+          await createReport({
+            projectId: String(projectIdValue),
+            taskId: taskIdValue ? (Number(taskIdValue) || String(taskIdValue)) : undefined,
+            authorId: Number(authorId) || String(authorId),
+            title,
+            description,
+            difficulties: difficulties || undefined,
+            materialsUsed,
+            observations: observations || undefined,
+            images: reportImages.length > 0 ? reportImages : undefined,
+            materials: reportMaterials.length > 0 ? reportMaterials : undefined,
+          });
+        }
 
         Alert.alert(
           'Éxito',
-          'Reporte guardado correctamente',
+          isResubmitting ? 'Reporte reenviado correctamente' : 'Reporte guardado correctamente',
           [
-            ...(taskId ? [{
+            ...(taskIdValue ? [{
               text: 'Ver Tarea',
               onPress: () => router.push({
                 pathname: '/task-detail',
-                params: { projectId: String(projectId), taskId: String(taskId) }
+                params: { projectId: String(projectIdValue), taskId: String(taskIdValue) }
               }),
             }] : []),
             {
@@ -523,7 +647,11 @@ export default function CreateReportScreen() {
           <ArrowLeft size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {sendAsIncident ? 'Crear Incidencia' : 'Crear Reporte'}
+          {isResubmitting
+            ? 'Reenviar Reporte'
+            : sendAsIncident
+              ? 'Crear Incidencia'
+              : 'Crear Reporte'}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -557,7 +685,7 @@ export default function CreateReportScreen() {
               )}
 
               {/* Solo mostrar toggle si no viene desde select-project-type */}
-              {!sendAsIncidentParam && !isIncidentOnlyRole && (
+              {!isIncidentOnlyRole && !isResubmitting && (
                 <View style={styles.formGroup}>
                   <View style={styles.switchContainer}>
                     <View style={styles.switchLabelContainer}>
@@ -719,7 +847,6 @@ export default function CreateReportScreen() {
                     <TouchableOpacity
                       style={styles.addMaterialButton}
                       onPress={openMaterialModal}
-                      disabled={isLoadingCatalog || catalogMaterials.length === 0}
                     >
                       <Plus size={20} color={COLORS.primary} />
                       <Text style={styles.addMaterialButtonText}>
@@ -830,6 +957,8 @@ export default function CreateReportScreen() {
                 ? 'Sin permisos para reportar'
                 : sendAsIncident
                 ? 'Guardar Incidencia'
+                : isResubmitting
+                ? 'Reenviar Reporte'
                 : 'Guardar Reporte'}
             </Text>
           </TouchableOpacity>

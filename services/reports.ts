@@ -74,6 +74,62 @@ const pickString = (source: Record<string, unknown>, ...keys: string[]): string 
   return undefined;
 };
 
+const pickMaterialName = (value: Record<string, unknown>): string | undefined =>
+  pickString(value, 'materialName', 'material_name', 'name', 'nombre', 'material', 'descripcion');
+
+const pickMaterialUnit = (value: Record<string, unknown>): string | undefined =>
+  pickString(value, 'unit', 'unidad', 'unidad_medida', 'unitOfMeasure', 'unit_of_measure');
+
+const pickMaterialQuantity = (value: Record<string, unknown>): number | undefined => {
+  const raw =
+    value.quantity ??
+    value.cantidad ??
+    value.qty ??
+    value.cantidad_usada ??
+    value.cantidadUsada ??
+    value.usedQuantity ??
+    value.used_quantity;
+  const parsed = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const resolveReportMaterials = (raw: Record<string, unknown>): ReportDetail['materials'] | undefined => {
+  const list =
+    (Array.isArray(raw.materials) ? raw.materials : null) ??
+    (Array.isArray(raw.materiales) ? raw.materiales : null) ??
+    (Array.isArray(raw.reportMaterials) ? raw.reportMaterials : null) ??
+    (Array.isArray(raw.materials_used) ? raw.materials_used : null);
+  if (!list) return undefined;
+  const mapped = list
+    .map(item => {
+      if (!item || typeof item !== 'object') return null;
+      const value = item as Record<string, unknown>;
+      const material =
+        (value.material as Record<string, unknown> | null | undefined) ??
+        (value.materiale as Record<string, unknown> | null | undefined);
+      const materialId =
+        value.materialId ??
+        value.material_id ??
+        value.id_material ??
+        value.materialId ??
+        value.material_id ??
+        (material ? material.id ?? material.materialId ?? material.material_id : undefined);
+      const materialName = pickMaterialName(value) ?? (material ? pickMaterialName(material) : undefined);
+      const unit = pickMaterialUnit(value) ?? (material ? pickMaterialUnit(material) : undefined) ?? '';
+      const quantity = pickMaterialQuantity(value) ?? 0;
+      if (!materialId) return null;
+      return {
+        materialId: String(materialId),
+        materialName,
+        unit,
+        quantity,
+        observations: pickString(value, 'observations', 'observacion', 'observaciones', 'observation'),
+      };
+    })
+    .filter(Boolean) as NonNullable<ReportDetail['materials']>;
+  return mapped.length ? mapped : undefined;
+};
+
 const mapReportStatus = (status?: MaybeString): Report['status'] => {
   const normalized = normalizeString(status)?.toLowerCase();
   switch (normalized) {
@@ -163,6 +219,9 @@ export async function listReports(projectId?: string, taskId?: string): Promise<
           : typeof raw.progressPercentage === 'number'
             ? (raw.progressPercentage as number)
             : undefined;
+    const materialsUsedValue =
+      normalizeString((r as { materialsUsed?: string | null }).materialsUsed) ??
+      pickString(raw, 'materialsUsed', 'materialesUsados', 'materiales_utilizados');
 
     return {
       id: r.id,
@@ -172,6 +231,7 @@ export async function listReports(projectId?: string, taskId?: string): Promise<
       type: typeValue,
       status,
       progress: progressValue || undefined,
+      materialsUsed: materialsUsedValue || undefined,
       authorId: r.authorId || undefined,
       authorName:
         (r.authorName ?? pickString(raw, 'author', 'autor', 'autorNombre', 'autor_nombre')) || undefined,
@@ -181,7 +241,7 @@ export async function listReports(projectId?: string, taskId?: string): Promise<
   });
 }
 
-export async function getReport(id: string): Promise<ReportDetail & { taskId?: string; taskTitle?: string; taskDescription?: string; taskStatus?: string }> {
+export async function getReport(id: string): Promise<ReportDetail> {
   const apiReport = await fetchJson<ApiReportDetail>(`/reports/${id}`);
   const raw = apiReport as Record<string, unknown>;
 
@@ -215,6 +275,13 @@ export async function getReport(id: string): Promise<ReportDetail & { taskId?: s
   const locationValue = normalizeString(apiReport.location) ?? pickString(raw, 'ubicacion') ?? '';
   const descriptionValue = normalizeString(apiReport.description) ?? pickString(raw, 'descripcion') ?? '';
   const observationsValue = normalizeString(apiReport.observations) ?? pickString(raw, 'observaciones');
+  const difficultiesValue =
+    normalizeString(apiReport.difficulties) ??
+    pickString(raw, 'dificultades', 'difficulties');
+  const materialsUsedValue =
+    normalizeString(apiReport.materialsUsed) ??
+    pickString(raw, 'materialesUsados', 'materiales_usados', 'materialsUsed', 'materials_used');
+  const materialsList = resolveReportMaterials(raw);
 
   const approvedBy = pickString(
     raw,
@@ -295,6 +362,10 @@ export async function getReport(id: string): Promise<ReportDetail & { taskId?: s
     taskTitle: apiReport.taskTitle || undefined,
     taskDescription: apiReport.taskDescription || undefined,
     taskStatus: apiReport.taskStatus || undefined,
+    projectId: apiReport.projectId || undefined,
+    difficulties: difficultiesValue,
+    materialsUsed: materialsUsedValue,
+    materials: materialsList,
   };
 }
 
@@ -311,6 +382,18 @@ export interface ReportMaterial {
   unit: string;
   observations?: string;
 }
+
+export type ReportResubmitPayload = {
+  title?: string;
+  description?: string;
+  reportDate?: string;
+  difficulties?: string;
+  materialsUsed?: string;
+  observations?: string;
+  attachments?: number[];
+  images?: ReportImage[];
+  materials?: ReportMaterial[];
+};
 
 export async function createReport(payload: {
   projectId: string;
@@ -376,3 +459,16 @@ export const approveReport = (id: string, payload?: ReportReviewPayload) =>
   reviewReport('approve', id, payload);
 
 export const rejectReport = (id: string, payload?: ReportReviewPayload) => reviewReport('reject', id, payload);
+
+export const resubmitReport = async (id: string, payload?: ReportResubmitPayload): Promise<ReportReviewResult> => {
+  const safeId = String(id);
+  const response = await fetchJson<ApiReportReviewResponse, ReportResubmitPayload>(`/reports/${safeId}/resubmit`, {
+    method: 'POST',
+    body: payload && Object.keys(payload).length > 0 ? payload : undefined,
+  });
+  const detail = await getReport(safeId);
+  return {
+    message: response?.message || 'Reporte reenviado para revisión.',
+    report: detail,
+  };
+};

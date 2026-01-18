@@ -4,7 +4,7 @@ import { ArrowLeft, Calendar, MapPin, User, Camera, CircleCheck as CheckCircle, 
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
 import { useEffect, useState, useCallback } from 'react';
-import { getReport, approveReport, rejectReport } from '@/services/reports';
+import { getReport, approveReport, rejectReport, resubmitReport } from '@/services/reports';
 import { getRole, getRoleSlug, hasPermission, getUser } from '@/services/auth';
 import type { HttpError } from '@/lib/http';
 import type { ReportDetail as ReportDetailType } from '@/types/domain';
@@ -234,7 +234,12 @@ export default function ReportDetailScreen() {
     setMaterialsError([]);
     try {
       const payload = observations.trim() ? { observations: observations.trim() } : undefined;
-      const actionFn = currentAction === 'reject' ? rejectReport : approveReport;
+      const actionFn =
+        currentAction === 'reject'
+          ? rejectReport
+          : currentAction === 'resend'
+            ? resubmitReport
+            : approveReport;
       const result = await actionFn(resolvedReportId, payload);
       setData(result.report);
       setModalVisible(false);
@@ -327,6 +332,29 @@ export default function ReportDetailScreen() {
           <Text style={styles.descriptionText}>{data.description}</Text>
         </View>
 
+        <View style={styles.materialsCard}>
+          <Text style={styles.cardTitle}>Materiales usados</Text>
+          {data.materials && data.materials.length > 0 ? (
+            <View style={styles.materialsList}>
+              {data.materials.map((material, index) => (
+                <View key={`${material.materialId}-${index}`} style={styles.materialRow}>
+                  <Text style={styles.materialName}>
+                    {material.materialName || `Material ${material.materialId}`}
+                  </Text>
+                  <Text style={styles.materialMeta}>
+                    {material.quantity} {material.unit || 'unidad'}
+                    {material.observations ? ` • ${material.observations}` : ''}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : data.materialsUsed ? (
+            <Text style={styles.materialText}>{data.materialsUsed}</Text>
+          ) : (
+            <Text style={styles.noMaterialsText}>Sin materiales reportados</Text>
+          )}
+        </View>
+
         <View style={styles.imagesCard}>
           <View style={styles.imagesHeader}>
             <Camera size={20} color="#6B7280" />
@@ -369,7 +397,19 @@ export default function ReportDetailScreen() {
               Este reporte fue rechazado. Corrige los detalles necesarios y vuelve a enviarlo para su revisión.
             </Text>
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={[styles.actionButton, styles.resendButton]} onPress={() => openReviewModal('resend')}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.resendButton]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/create-report',
+                    params: {
+                      reportId: data.id,
+                      projectId: data.projectId ?? undefined,
+                      taskId: data.taskId ?? undefined,
+                    },
+                  })
+                }
+              >
                 <Text style={[styles.actionButtonText, styles.resendButtonText]}>Reenviar</Text>
               </TouchableOpacity>
             </View>
@@ -510,6 +550,13 @@ const styles = StyleSheet.create({
   descriptionCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   cardTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937', marginBottom: 12 },
   descriptionText: { fontSize: 16, color: '#374151', lineHeight: 24 },
+  materialsCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  materialsList: { gap: 10 },
+  materialRow: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  materialName: { fontSize: 15, fontWeight: '600', color: '#111827' },
+  materialMeta: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+  materialText: { fontSize: 15, color: '#374151', lineHeight: 22 },
+  noMaterialsText: { color: '#6B7280', fontSize: 14 },
   imagesCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   imagesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

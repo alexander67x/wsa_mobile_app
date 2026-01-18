@@ -28,7 +28,7 @@ export default function WorkerHome() {
             const derivedProgress = tasks.length ? Math.round((completedTasks / tasks.length) * 100) : undefined;
             const normalizedProgress = Number(detail.progress);
             const resolvedProgress = Number.isFinite(normalizedProgress)
-              ? normalizedProgress
+              ? Math.max(normalizedProgress, derivedProgress ?? 0)
               : derivedProgress ?? project.progress ?? 0;
             return {
               ...project,

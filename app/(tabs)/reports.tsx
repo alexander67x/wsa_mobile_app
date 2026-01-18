@@ -8,12 +8,12 @@ import { listIncidencias } from '@/services/incidencias';
 import type { Incident } from '@/services/incidencias';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
-import { getRoleSlug } from '@/services/auth';
+import { getRoleSlug, isSupervisorRoleSlug } from '@/services/auth';
 
 export default function ReportsScreen() {
   const roleSlug = getRoleSlug();
   const isProjectLeadRole = roleSlug === 'responsable_proyecto';
-  const isSupervisorRole = roleSlug === 'supervisor';
+  const isSupervisorRole = isSupervisorRoleSlug(roleSlug);
   const canViewIncidents = isProjectLeadRole || isSupervisorRole;
   const [activeFilter, setActiveFilter] = useState('all');
   const [reports, setReports] = useState<Report[]>([]);

@@ -12,7 +12,7 @@ import { getRoleSlug } from '@/services/auth';
 export default function TaskDetailScreen() {
   const { projectId, taskId, fromKanban } = useLocalSearchParams();
   const roleSlug = getRoleSlug();
-  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto' || roleSlug === 'supervisor';
+  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto';
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -90,6 +90,7 @@ export default function TaskDetailScreen() {
       default: return 'Desconocido';
     }
   };
+  const isTaskCompleted = task.status === 'completed';
 
   return (
     <View style={styles.container}>
@@ -201,7 +202,7 @@ export default function TaskDetailScreen() {
         </View>
       </ScrollView>
 
-      {fromKanban !== 'true' && (
+      {fromKanban !== 'true' && !isTaskCompleted && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.createReportButton}
