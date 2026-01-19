@@ -49,6 +49,7 @@ export default function CreateReportScreen() {
   const sendAsIncidentParam = params.sendAsIncident;
   const roleSlug = getRoleSlug();
   const isIncidentOnlyRole = roleSlug === 'responsable_proyecto';
+  const isResubmitting = Boolean(resubmitReportId);
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
   const [resolvedProjectId, setResolvedProjectId] = useState<string | undefined>(
@@ -75,12 +76,12 @@ export default function CreateReportScreen() {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [sendAsIncident, setSendAsIncident] = useState(
-    isIncidentOnlyRole ? true : sendAsIncidentParam === 'true',
+    isResubmitting ? false : isIncidentOnlyRole ? true : sendAsIncidentParam === 'true',
   );
   const [incidentType, setIncidentType] = useState<'falla_equipos' | 'accidente' | 'retraso_material' | 'problema_calidad' | 'otro'>('otro');
   const [incidentSeverity, setIncidentSeverity] = useState<'critica' | 'alta' | 'media' | 'baja'>('media');
-  const isResubmitting = Boolean(resubmitReportId);
-  const isReportCreationRestricted = !isResubmitting && isIncidentOnlyRole && !sendAsIncident;
+  const isIncidentFlow = !isResubmitting && sendAsIncident;
+  const isReportCreationRestricted = !isResubmitting && isIncidentOnlyRole && !isIncidentFlow;
   const saveButtonDisabled = isSubmitting || isReportCreationRestricted;
   const isLoading = isLoadingProject || isLoadingReport;
 
@@ -120,7 +121,16 @@ export default function CreateReportScreen() {
         if (report.taskId) setResolvedTaskId(String(report.taskId));
         if (report.images?.length) {
           const now = new Date().toISOString();
-          setImages(report.images.map((uri) => ({ uri, takenAt: now })));
+          const normalizedImages = report.images.map((image: any) => {
+            if (typeof image === 'string') {
+              return { uri: image, takenAt: now };
+            }
+            if (image && typeof image === 'object' && typeof image.url === 'string') {
+              return { uri: image.url, takenAt: image.takenAt || now };
+            }
+            return null;
+          }).filter(Boolean) as ImageWithTimestamp[];
+          setImages(normalizedImages);
         }
         if (report.materials?.length) {
           setSelectedMaterials(report.materials.map(material => ({
@@ -412,7 +422,7 @@ export default function CreateReportScreen() {
       return;
     }
 
-    if (sendAsIncident && !incidentType) {
+    if (isIncidentFlow && !incidentType) {
       Alert.alert('Error', 'Por favor selecciona el tipo de incidencia');
       return;
     }
@@ -455,10 +465,11 @@ export default function CreateReportScreen() {
       const isRemoteImage = (uri: string) => /^https?:\/\//i.test(uri);
       const remoteImages = images.filter(img => isRemoteImage(img.uri));
       const localImages = images.filter(img => !isRemoteImage(img.uri));
+      const needsLocationForImages = localImages.length > 0;
 
       // Upload images to Cloudinary first if there are any
       if (localImages.length > 0 || remoteImages.length > 0) {
-        if (!deviceLocation) {
+        if (!deviceLocation && needsLocationForImages) {
           Alert.alert(
             'Ubicación requerida',
             'Se necesita la ubicación del dispositivo para subir imágenes. ¿Deseas continuar sin imágenes?',
@@ -481,14 +492,14 @@ export default function CreateReportScreen() {
           // Map uploaded URLs with location and timestamps
           const uploadedImages = uploadedUrls.map((url, index) => ({
             url,
-            latitude: deviceLocation!.latitude,
-            longitude: deviceLocation!.longitude,
+            latitude: deviceLocation?.latitude,
+            longitude: deviceLocation?.longitude,
             takenAt: localImages[index]?.takenAt,
           }));
           const existingImages = remoteImages.map((image) => ({
             url: image.uri,
-            latitude: deviceLocation!.latitude,
-            longitude: deviceLocation!.longitude,
+            latitude: deviceLocation?.latitude,
+            longitude: deviceLocation?.longitude,
             takenAt: image.takenAt,
           }));
           reportImages = [...existingImages, ...uploadedImages];
@@ -509,7 +520,7 @@ export default function CreateReportScreen() {
         }
       }
 
-      if (sendAsIncident) {
+      if (isIncidentFlow) {
         // Create incident instead of report
         const incidentImages: IncidentImage[] = reportImages.map((img) => ({
           url: img.url,
@@ -649,7 +660,7 @@ export default function CreateReportScreen() {
         <Text style={styles.headerTitle}>
           {isResubmitting
             ? 'Reenviar Reporte'
-            : sendAsIncident
+            : isIncidentFlow
               ? 'Crear Incidencia'
               : 'Crear Reporte'}
         </Text>
@@ -707,7 +718,7 @@ export default function CreateReportScreen() {
               )}
             </View>
 
-            {sendAsIncident ? (
+            {isIncidentFlow ? (
               // Formulario de Incidencia
               <>
                 <View style={styles.formSection}>
@@ -955,7 +966,7 @@ export default function CreateReportScreen() {
                 ? 'Guardando...'
                 : isReportCreationRestricted
                 ? 'Sin permisos para reportar'
-                : sendAsIncident
+                : isIncidentFlow
                 ? 'Guardar Incidencia'
                 : isResubmitting
                 ? 'Reenviar Reporte'

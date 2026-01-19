@@ -3,10 +3,17 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { Save, Camera } from 'lucide-react-native';
 import { addCard } from '@/services/kanban';
 import { getUser } from '@/services/auth';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '@/theme';
+import CreateReportScreen from '../create-report';
 
 export default function WorkerCreateReport() {
+  const params = useLocalSearchParams<{ reportId?: string | string[] }>();
+  const reportId = Array.isArray(params.reportId) ? params.reportId[0] : params.reportId;
+  if (reportId) {
+    return <CreateReportScreen />;
+  }
+
   const [description, setDescription] = useState('');
   const [photosCount, setPhotosCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -93,6 +93,29 @@ const pickMaterialQuantity = (value: Record<string, unknown>): number | undefine
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const resolveReportImages = (raw: Record<string, unknown>): string[] => {
+  const candidates = [
+    raw.images,
+    raw.imagenes,
+    raw.evidencias,
+    raw.attachments,
+    raw.archivos,
+  ];
+  const list = candidates.find((value) => Array.isArray(value)) as Array<unknown> | undefined;
+  if (!list) return [];
+  return list
+    .map((entry) => {
+      if (typeof entry === 'string') return entry;
+      if (entry && typeof entry === 'object') {
+        const bag = entry as Record<string, unknown>;
+        const url = pickString(bag, 'url', 'uri', 'image', 'imagen');
+        return url ?? null;
+      }
+      return null;
+    })
+    .filter((value): value is string => Boolean(value));
+};
+
 const resolveReportMaterials = (raw: Record<string, unknown>): ReportDetail['materials'] | undefined => {
   const list =
     (Array.isArray(raw.materials) ? raw.materials : null) ??
@@ -338,6 +361,7 @@ export async function getReport(id: string): Promise<ReportDetail> {
     rejectedBy || (status === 'rejected' ? resolvedApprovedBy : undefined);
   const resolvedRejectedDate =
     rejectedDate || (status === 'rejected' ? resolvedApprovedDate : undefined);
+  const resolvedImages = resolveReportImages(raw);
 
   return {
     id: apiReport.id,
@@ -352,7 +376,7 @@ export async function getReport(id: string): Promise<ReportDetail> {
     location: locationValue,
     description: descriptionValue,
     observations: observationsValue,
-    images: apiReport.images || [],
+    images: resolvedImages,
     approvedBy: resolvedApprovedBy,
     approvedDate: resolvedApprovedDate,
     rejectedBy: resolvedRejectedBy,
@@ -371,8 +395,8 @@ export async function getReport(id: string): Promise<ReportDetail> {
 
 export interface ReportImage {
   url: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
   takenAt?: string;
 }
 

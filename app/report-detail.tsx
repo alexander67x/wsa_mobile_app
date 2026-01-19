@@ -252,6 +252,15 @@ export default function ReportDetailScreen() {
       Alert.alert('Acción completada', successMessage);
     } catch (error) {
       console.error('Error reviewing report', error);
+      if (currentAction === 'reject') {
+        const rejectionError = error as HttpError;
+        console.error('[report-detail] reject report API error', {
+          status: rejectionError?.status,
+          message: rejectionError?.message,
+          data: rejectionError?.data,
+          rawBody: rejectionError?.rawBody,
+        });
+      }
       const httpError = error as HttpError;
       const message = httpError?.message || 'No se pudo completar la acción.';
       setActionError(message);
