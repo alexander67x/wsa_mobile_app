@@ -12,7 +12,8 @@ import { getRoleSlug } from '@/services/auth';
 export default function TaskDetailScreen() {
   const { projectId, taskId, fromKanban } = useLocalSearchParams();
   const roleSlug = getRoleSlug();
-  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto';
+  const canCreateProgressReport = roleSlug === 'personal_obra';
+  const isIncidentOnlyRole = !canCreateProgressReport;
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
   const [reports, setReports] = useState<Report[]>([]);

@@ -8,7 +8,7 @@ import * as Location from 'expo-location';
 import { getProject } from '@/services/projects';
 import { createReport, getReport, resubmitReport, type ReportImage, type ReportMaterial } from '@/services/reports';
 import { createIncident, type IncidentImage } from '@/services/incidencias';
-import { getUser, getRoleSlug, isSupervisorRoleSlug } from '@/services/auth';
+import { getUser, getRoleSlug } from '@/services/auth';
 import { uploadImagesToCloudinary } from '@/services/cloudinary';
 import { listCatalog } from '@/services/materials';
 import type { ProjectDetail } from '@/types/domain';
@@ -48,7 +48,8 @@ export default function CreateReportScreen() {
   const resubmitReportId = normalizeParam(params.reportId);
   const sendAsIncidentParam = params.sendAsIncident;
   const roleSlug = getRoleSlug();
-  const isIncidentOnlyRole = roleSlug === 'responsable_proyecto';
+  const canCreateProgressReport = roleSlug === 'personal_obra';
+  const isIncidentOnlyRole = !canCreateProgressReport;
   const isResubmitting = Boolean(resubmitReportId);
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);

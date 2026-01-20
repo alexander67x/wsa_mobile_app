@@ -434,8 +434,8 @@ export async function createReport(payload: {
   materials?: ReportMaterial[];
 }): Promise<{ id: string }> {
   const roleSlug = getRoleSlug();
-  if (roleSlug === 'responsable_proyecto') {
-    throw new Error('Los responsables de proyecto no pueden enviar reportes.');
+  if (roleSlug !== 'personal_obra') {
+    throw new Error('No tienes permisos para enviar reportes de avance.');
   }
   const response = await fetchJson<{ id: string; report: ApiReport }, typeof payload>(
     '/reports',
