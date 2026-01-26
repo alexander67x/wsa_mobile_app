@@ -7,11 +7,13 @@ import { COLORS } from '@/theme';
 import { getProject } from '@/services/projects';
 import { listReports } from '@/services/reports';
 import type { ProjectDetail, Report } from '@/types/domain';
-import { getRoleSlug } from '@/services/auth';
+import { ensureEmployeeId, getRole, getRoleSlug, getUser } from '@/services/auth';
 
 export default function TaskDetailScreen() {
   const { projectId, taskId, fromKanban } = useLocalSearchParams();
+  const role = getRole();
   const roleSlug = getRoleSlug();
+  const isWorker = role === 'worker';
   const canCreateProgressReport = roleSlug === 'personal_obra';
   const isIncidentOnlyRole = !canCreateProgressReport;
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -19,6 +21,7 @@ export default function TaskDetailScreen() {
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAssignedToWorker, setIsAssignedToWorker] = useState<boolean | null>(null);
 
   const loadTask = async () => {
     if (!projectId || !taskId) {
@@ -56,6 +59,34 @@ export default function TaskDetailScreen() {
   useEffect(() => {
     loadTask();
   }, [projectId, taskId]);
+
+  useEffect(() => {
+    let isActive = true;
+    const resolveAssignment = async () => {
+      if (!task) {
+        if (isActive) setIsAssignedToWorker(null);
+        return;
+      }
+      if (!isWorker) {
+        if (isActive) setIsAssignedToWorker(true);
+        return;
+      }
+      const user = getUser();
+      const employeeId = await ensureEmployeeId();
+      const assigneeSource = `${task.assignee ?? ''} ${task.responsible ?? ''}`.toLowerCase().trim();
+      const normalizedName = user?.name?.toLowerCase().trim();
+      const normalizedEmployeeId = employeeId ? String(employeeId).toLowerCase().trim() : undefined;
+      const matchesName = normalizedName ? assigneeSource.includes(normalizedName) : false;
+      const matchesEmployeeId = normalizedEmployeeId ? assigneeSource.includes(normalizedEmployeeId) : false;
+      if (isActive) {
+        setIsAssignedToWorker(Boolean(assigneeSource) && (matchesName || matchesEmployeeId));
+      }
+    };
+    resolveAssignment();
+    return () => {
+      isActive = false;
+    };
+  }, [task, isWorker]);
 
   if (isLoading || !task || !project) {
     return (
@@ -172,11 +203,13 @@ export default function TaskDetailScreen() {
           {reports.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No hay reportes para esta tarea</Text>
-              <Text style={styles.emptySubtext}>
-                {isIncidentOnlyRole
-                  ? 'Registra una incidencia para documentar esta tarea.'
-                  : 'Crea un reporte para registrar el avance de esta tarea'}
-              </Text>
+              {isWorker && (
+                <Text style={styles.emptySubtext}>
+                  {isIncidentOnlyRole
+                    ? 'Registra una incidencia para documentar esta tarea.'
+                    : 'Crea un reporte para registrar el avance de esta tarea'}
+                </Text>
+              )}
             </View>
           ) : (
             reports.map(report => (
@@ -203,7 +236,7 @@ export default function TaskDetailScreen() {
         </View>
       </ScrollView>
 
-      {fromKanban !== 'true' && !isTaskCompleted && (
+      {fromKanban !== 'true' && !isTaskCompleted && isWorker && isAssignedToWorker && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.createReportButton}

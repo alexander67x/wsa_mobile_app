@@ -270,7 +270,6 @@ export default function WorkerProfile() {
             highlightedProjects.map(project => {
               const statusMeta = PROJECT_STATUS_META[project.status];
               const dueLabel = formatDate(project.dueDate || project.deadline);
-              const progress = Math.min(Math.max(Math.round(project.progress ?? 0), 0), 100);
               return (
                 <TouchableOpacity
                   key={project.id}
@@ -298,23 +297,11 @@ export default function WorkerProfile() {
                     </View>
                   </View>
 
-                  <View style={styles.projectMetaRow}>
-                    <Text style={styles.projectMetaText}>
-                      Avance <Text style={styles.projectMetaBold}>{progress}%</Text>
-                    </Text>
-                    {dueLabel ? (
+                  {dueLabel ? (
+                    <View style={styles.projectMetaRow}>
                       <Text style={styles.projectMetaText}>Entrega {dueLabel}</Text>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${progress}%`, backgroundColor: statusMeta.color },
-                      ]}
-                    />
-                  </View>
+                    </View>
+                  ) : null}
                 </TouchableOpacity>
               );
             })
