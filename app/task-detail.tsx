@@ -4,9 +4,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Calendar, FileText, Plus, CheckCircle, Clock, Play } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '@/theme';
-import { getProject } from '@/services/projects';
 import { listReports } from '@/services/reports';
-import type { ProjectDetail, Report } from '@/types/domain';
+import { getTask } from '@/services/tasks';
+import type { Report, TaskDetail } from '@/types/domain';
 import { ensureEmployeeId, getRole, getRoleSlug, getUser } from '@/services/auth';
 
 export default function TaskDetailScreen() {
@@ -16,8 +16,8 @@ export default function TaskDetailScreen() {
   const isWorker = role === 'worker';
   const canCreateProgressReport = roleSlug === 'personal_obra';
   const isIncidentOnlyRole = !canCreateProgressReport;
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [task, setTask] = useState<any>(null);
+  const [projectName, setProjectName] = useState<string>('');
+  const [task, setTask] = useState<TaskDetail | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -32,20 +32,14 @@ export default function TaskDetailScreen() {
 
     setIsLoading(true);
     try {
-      const [projectData, reportsData] = await Promise.all([
-        getProject(String(projectId)),
+      const [taskResponse, reportsData] = await Promise.all([
+        getTask(String(taskId)),
         listReports(String(projectId), String(taskId)),
       ]);
-      setProject(projectData);
-      const foundTask = projectData.tasks.find(t => t.id === String(taskId));
-      if (foundTask) {
-        setTask(foundTask);
-        // Los reportes ya vienen filtrados por taskId desde la API
-        setReports(reportsData);
-      } else {
-        Alert.alert('Error', 'Tarea no encontrada');
-        router.back();
-      }
+      setTask(taskResponse.task);
+      setProjectName(taskResponse.task.projectName || '');
+      // Los reportes ya vienen filtrados por taskId desde la API
+      setReports(reportsData);
     } catch (error) {
       console.error('Error loading task:', error);
       Alert.alert('Error', 'No se pudo cargar la información de la tarea');
@@ -88,7 +82,7 @@ export default function TaskDetailScreen() {
     };
   }, [task, isWorker]);
 
-  if (isLoading || !task || !project) {
+  if (isLoading || !task) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>Cargando tarea...</Text>
@@ -150,7 +144,7 @@ export default function TaskDetailScreen() {
 
           <View style={styles.projectInfo}>
             <Text style={styles.projectLabel}>Proyecto:</Text>
-            <Text style={styles.projectName}>{project.name}</Text>
+            <Text style={styles.projectName}>{projectName || 'Proyecto'}</Text>
           </View>
 
           {task.assignee && (

@@ -115,6 +115,45 @@ const coerceString = (value: MaybeString): string | undefined => {
   return stringified.length ? stringified : undefined;
 };
 
+const coerceStringList = (value: unknown): string[] => {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap(entry => coerceStringList(entry));
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const candidate = coerceString(
+      (obj.name ??
+        obj.nombre ??
+        obj.fullName ??
+        obj.full_name ??
+        obj.label ??
+        obj.value ??
+        obj.usuario ??
+        obj.user ??
+        obj.responsable ??
+        obj.assignee) as MaybeString,
+    );
+    return candidate ? [candidate] : [];
+  }
+  const candidate = coerceString(value as MaybeString);
+  return candidate ? [candidate] : [];
+};
+
+const dedupeStrings = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  values.forEach(value => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(trimmed);
+  });
+  return result;
+};
+
 const resolveProgress = (project: ApiProject): number => {
   const raw = project as Record<string, unknown>;
   const candidate =
@@ -272,22 +311,33 @@ const resolveTasksFromDetail = (project: ApiProjectDetail): ProjectDetail['tasks
           taskRaw.detalles ??
           taskRaw.observaciones,
       ) ?? undefined;
-    const assignee =
-      coerceString(
-        taskRaw.assignee ??
+    const assigneeList = dedupeStrings(
+      coerceStringList(
+        taskRaw.assignees ??
+          taskRaw.assignedTo ??
+          taskRaw.assigned_to ??
+          taskRaw.asignados ??
+          taskRaw.asignadosA ??
           taskRaw.asignadoA ??
-          taskRaw.responsable ??
+          taskRaw.assignee ??
           taskRaw.asignado ??
+          taskRaw.responsables ??
+          taskRaw.responsable ??
           taskRaw.owner,
-      ) ?? '';
-    const responsible =
-      coerceString(
-        taskRaw.responsable ??
+      ),
+    );
+    const assignee = assigneeList.join(', ');
+    const responsibleList = dedupeStrings(
+      coerceStringList(
+        taskRaw.responsables ??
+          taskRaw.responsable ??
           taskRaw.responsable_nombre ??
           taskRaw.responsableName ??
           taskRaw.encargado ??
           taskRaw.owner,
-      ) ?? undefined;
+      ),
+    );
+    const responsible = responsibleList.length ? responsibleList.join(', ') : undefined;
     const dueDate =
       coerceString(
         taskRaw.dueDate ??

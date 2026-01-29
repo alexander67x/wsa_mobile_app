@@ -36,6 +36,26 @@ export default function WorkerAssignments() {
       const employeeId = await ensureEmployeeId();
       const normalizedName = user?.name?.toLowerCase().trim();
       const normalizedEmployeeId = employeeId ? String(employeeId).toLowerCase() : undefined;
+      const splitAssignees = (value?: string) =>
+        (value ?? '')
+          .split(/[,;/|]+|\s+y\s+|\s*&\s*|\/+/i)
+          .map(item => item.trim())
+          .filter(Boolean);
+      const buildAssigneeTokens = (assignee?: string, responsible?: string) => {
+        const tokens = [...splitAssignees(assignee), ...splitAssignees(responsible)];
+        const seen = new Set<string>();
+        return tokens.filter(token => {
+          const key = token.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+      const formatAssigneeDisplay = (assignee?: string, responsible?: string) => {
+        const tokens = buildAssigneeTokens(assignee, responsible);
+        if (!tokens.length) return 'Sin responsable';
+        return tokens.join(', ');
+      };
 
       const details = await Promise.all(
         projects.map(async (project) => {
@@ -53,16 +73,23 @@ export default function WorkerAssignments() {
         if (!entry) return;
         const { project, detail } = entry;
         detail.tasks.forEach((task) => {
-          const assignee = (task.assignee || task.responsible || '').toLowerCase().trim();
-          const matchesName = normalizedName ? assignee.includes(normalizedName) : false;
-          const matchesEmployeeId = normalizedEmployeeId ? assignee.includes(normalizedEmployeeId) : false;
+          const assigneeTokens = buildAssigneeTokens(task.assignee, task.responsible);
+          const assigneeSource = assigneeTokens.join(' ').toLowerCase();
+          const matchesName = normalizedName
+            ? assigneeTokens.some(token => token.toLowerCase().includes(normalizedName)) ||
+              assigneeSource.includes(normalizedName)
+            : false;
+          const matchesEmployeeId = normalizedEmployeeId
+            ? assigneeTokens.some(token => token.toLowerCase().includes(normalizedEmployeeId)) ||
+              assigneeSource.includes(normalizedEmployeeId)
+            : false;
           if (!matchesName && !matchesEmployeeId) return;
 
           assignedTasks.push({
             id: String(task.id),
             title: task.title,
             status: task.status,
-            assignee: task.assignee || task.responsible || undefined,
+            assignee: formatAssigneeDisplay(task.assignee, task.responsible),
             dueDate: task.dueDate || undefined,
             projectId: String(project.id),
             projectName: project.name,
@@ -214,6 +241,7 @@ export default function WorkerAssignments() {
                   </View>
                 </View>
                 <Text style={styles.cardMeta}>Proyecto: {task.projectName}</Text>
+                <Text style={styles.cardMeta}>Responsable: {task.assignee || 'Sin responsable'}</Text>
                 <Text style={styles.cardMeta}>Fecha limite: {formatDate(task.dueDate)}</Text>
               </TouchableOpacity>
             ))
