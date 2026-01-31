@@ -5,7 +5,7 @@ import { ArrowLeft, Camera, MapPin, Save, Trash2, Plus, X } from 'lucide-react-n
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { getProject } from '@/services/projects';
+import { getProject, getProjectStock, type ProjectStockMaterial } from '@/services/projects';
 import { createReport, getReport, resubmitReport, type ReportImage, type ReportMaterial } from '@/services/reports';
 import { createIncident, type IncidentImage } from '@/services/incidencias';
 import { getUser, getRoleSlug } from '@/services/auth';
@@ -53,6 +53,9 @@ export default function CreateReportScreen() {
   const isResubmitting = Boolean(resubmitReportId);
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [task, setTask] = useState<any>(null);
+  const [projectStock, setProjectStock] = useState<ProjectStockMaterial[]>([]);
+  const [isLoadingStock, setIsLoadingStock] = useState(false);
+  const [stockValidationReady, setStockValidationReady] = useState(false);
   const [resolvedProjectId, setResolvedProjectId] = useState<string | undefined>(
     initialProjectId ? String(initialProjectId) : undefined
   );
@@ -200,7 +203,6 @@ export default function CreateReportScreen() {
       listCatalog(String(resolvedProjectId))
         .then((materials) => {
           setCatalogMaterials(materials || []);
-          console.log('[create-report] catalog materials', materials);
           if (materials.length > 0) {
             setSelectedMaterialForAdd(materials[0].id);
           }
@@ -210,8 +212,24 @@ export default function CreateReportScreen() {
           // Don't show error, just continue without catalog
         })
         .finally(() => setIsLoadingCatalog(false));
+
+      // Load project stock to validate material availability
+      setIsLoadingStock(true);
+      getProjectStock(String(resolvedProjectId))
+        .then((stock) => {
+          setProjectStock(stock?.materials || []);
+          setStockValidationReady(true);
+        })
+        .catch((error) => {
+          console.error('Error loading project stock:', error);
+          setProjectStock([]);
+          setStockValidationReady(false);
+        })
+        .finally(() => setIsLoadingStock(false));
     } else {
       setIsLoadingProject(false);
+      setStockValidationReady(false);
+      setProjectStock([]);
     }
   }, [resolvedProjectId, resolvedTaskId, sendAsIncident, sendAsIncidentParam, isResubmitting]);
 
@@ -310,6 +328,10 @@ export default function CreateReportScreen() {
       Alert.alert('Cargando catálogo', 'Espera un momento mientras se cargan los materiales.');
       return;
     }
+    if (isLoadingStock) {
+      Alert.alert('Cargando stock', 'Espera un momento mientras se valida el stock del almacén.');
+      return;
+    }
     if (catalogMaterials.length === 0) {
       Alert.alert('Sin materiales', 'No hay materiales disponibles en el catálogo');
       return;
@@ -332,6 +354,37 @@ export default function CreateReportScreen() {
     setShowMaterialModal(true);
   };
 
+  const resolveStockItem = (materialId: string | number) =>
+    projectStock.find(
+      (item) => String(item.materialId) === String(materialId) || String(item.id) === String(materialId)
+    );
+
+  const resolveAvailableQty = (materialId: string | number) => {
+    if (!stockValidationReady) return null;
+    const item = resolveStockItem(materialId);
+    if (!item) return 0;
+    const availableReal = typeof item.availableReal === 'number' ? item.availableReal : null;
+    const available = typeof item.available === 'number' ? item.available : null;
+    return availableReal ?? available ?? 0;
+  };
+
+  const validateMaterialsAvailability = () => {
+    if (!stockValidationReady && selectedMaterials.length > 0) {
+      return ['No se pudo validar el stock del almacén asignado'];
+    }
+    const errors: string[] = [];
+    selectedMaterials.forEach((material) => {
+      const qty = parseFloat(material.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) return;
+      const available = resolveAvailableQty(material.materialId);
+      if (available === null) return;
+      if (qty > available) {
+        errors.push(`${material.materialName}: disponible ${available} ${material.unit || ''}`.trim());
+      }
+    });
+    return errors;
+  };
+
   const getSelectedMaterialData = (): CatalogItem | null => {
     return catalogMaterials.find(m => String(m.id) === String(selectedMaterialForAdd)) || null;
   };
@@ -351,6 +404,20 @@ export default function CreateReportScreen() {
     const quantity = parseFloat(materialQuantity);
     if (isNaN(quantity) || quantity <= 0) {
       Alert.alert('Error', 'Por favor ingresa una cantidad válida');
+      return;
+    }
+
+    if (!stockValidationReady) {
+      Alert.alert('Stock no disponible', 'No se pudo validar el stock del almacén asignado. Intenta de nuevo.');
+      return;
+    }
+
+    const availableQty = resolveAvailableQty(selectedMaterialForAdd);
+    if (availableQty !== null && quantity > availableQty) {
+      Alert.alert(
+        'Cantidad excede disponibilidad',
+        `No puedes usar más de ${availableQty} ${material.unit || ''} para este material.`
+      );
       return;
     }
 
@@ -531,6 +598,21 @@ export default function CreateReportScreen() {
           // description can be added later if needed
         }));
 
+        if (__DEV__) {
+          console.log('[create-report] incident payload', {
+            projectId: String(projectIdValue),
+            taskId: taskIdValue ? (Number(taskIdValue) || String(taskIdValue)) : undefined,
+            authorId: Number(authorId) || String(authorId),
+            title,
+            description,
+            tipo: incidentType,
+            severidad: incidentSeverity,
+            latitude: deviceLocation?.latitude,
+            longitude: deviceLocation?.longitude,
+            images: incidentImages.length > 0 ? incidentImages : undefined,
+          });
+        }
+
         await createIncident({
           projectId: String(projectIdValue),
           taskId: taskIdValue ? (Number(taskIdValue) || String(taskIdValue)) : undefined,
@@ -563,6 +645,16 @@ export default function CreateReportScreen() {
           ]
         );
       } else {
+        const availabilityErrors = validateMaterialsAvailability();
+        if (availabilityErrors.length > 0) {
+          Alert.alert(
+            'Material insuficiente',
+            `No hay suficiente stock para:\n${availabilityErrors.join('\n')}`
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
         // Create normal report
         const reportMaterials: ReportMaterial[] = selectedMaterials.map(m => ({
           materialId: Number(m.materialId) || m.materialId,
@@ -1053,6 +1145,11 @@ export default function CreateReportScreen() {
                       <Text style={styles.modalLabel}>
                         Cantidad ({selectedMaterial.unit}) <Text style={styles.required}>*</Text>
                       </Text>
+                      <Text style={styles.modalHint}>
+                        {stockValidationReady
+                          ? `Disponible: ${resolveAvailableQty(selectedMaterial.id)} ${selectedMaterial.unit}`
+                          : 'Stock no disponible'}
+                      </Text>
                       <TextInput
                         style={styles.modalInput}
                         placeholder="Ingresa la cantidad"
@@ -1417,6 +1514,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#374151',
     marginBottom: 8,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: -2,
+    marginBottom: 6,
   },
   modalInput: {
     backgroundColor: '#F9FAFB',

@@ -622,7 +622,7 @@ export async function listCatalog(projectId?: string): Promise<CatalogItem[]> {
   }
   const catalogItems = resolveCatalogItems(apiCatalog);
 
-  return catalogItems.map((item): CatalogItem => ({
+  const normalized = catalogItems.map((item): CatalogItem => ({
     id: String(item.id),
     name: item.name,
     unit: item.unit,
@@ -632,6 +632,14 @@ export async function listCatalog(projectId?: string): Promise<CatalogItem[]> {
     brand: item.brand,
     model: item.model,
   }));
+
+  // De-duplicate by id to avoid repeated keys and duplicated picks in UI.
+  const seen = new Set<string>();
+  return normalized.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
 }
 
 export interface CreateMaterialRequestInput {

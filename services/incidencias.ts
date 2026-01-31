@@ -1,4 +1,5 @@
 import { fetchJson } from '@/lib/http';
+import { API_URL } from '@/lib/config';
 import { getUser, getRole } from '@/services/auth';
 import { getMyProjects } from '@/services/projects';
 
@@ -23,6 +24,20 @@ export interface CreateIncidentPayload {
   longitude?: number;
   images?: IncidentImage[];
 }
+
+const VALID_INCIDENT_TYPES = new Set<CreateIncidentPayload['tipo']>([
+  'falla_equipos',
+  'accidente',
+  'retraso_material',
+  'problema_calidad',
+  'otro',
+]);
+const VALID_INCIDENT_SEVERITIES = new Set<NonNullable<CreateIncidentPayload['severidad']>>([
+  'critica',
+  'alta',
+  'media',
+  'baja',
+]);
 
 export interface Incident {
   id: string;
@@ -57,10 +72,30 @@ export interface IncidentDetail extends Incident {
 }
 
 export async function createIncident(payload: CreateIncidentPayload): Promise<{ id: string; incidencia: Incident }> {
+  if (!VALID_INCIDENT_TYPES.has(payload.tipo)) {
+    throw new Error('Tipo de incidencia inválido.');
+  }
+  if (payload.severidad && !VALID_INCIDENT_SEVERITIES.has(payload.severidad)) {
+    throw new Error('Severidad de incidencia inválida.');
+  }
+  const normalizedPayload: CreateIncidentPayload = {
+    ...payload,
+    severidad: payload.severidad ?? 'media',
+  };
+
+  if (__DEV__) {
+    console.log('[incidencias] POST', `${API_URL}/incidencias`);
+    console.log('[incidencias] payload', normalizedPayload);
+  }
+
   const response = await fetchJson<{ id: string; incidencia: Incident }, typeof payload>(
     '/incidencias',
-    { method: 'POST', body: payload }
+    { method: 'POST', body: normalizedPayload }
   );
+
+  if (__DEV__) {
+    console.log('[incidencias] response', response);
+  }
 
   return response;
 }

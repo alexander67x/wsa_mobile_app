@@ -23,6 +23,13 @@ export default function TaskDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAssignedToWorker, setIsAssignedToWorker] = useState<boolean | null>(null);
 
+  const normalizeToken = (value?: string | null) => (value ?? '').toLowerCase().trim();
+  const splitAssignees = (value?: string | null) =>
+    (value ?? '')
+      .split(/[,;|/]+/)
+      .map(entry => entry.trim())
+      .filter(Boolean);
+
   const loadTask = async () => {
     if (!projectId || !taskId) {
       Alert.alert('Error', 'Faltan parámetros necesarios');
@@ -61,17 +68,28 @@ export default function TaskDetailScreen() {
         if (isActive) setIsAssignedToWorker(null);
         return;
       }
-      if (!isWorker) {
+      const shouldValidateAssignment = isWorker || canCreateProgressReport;
+      if (!shouldValidateAssignment) {
         if (isActive) setIsAssignedToWorker(true);
         return;
       }
       const user = getUser();
       const employeeId = await ensureEmployeeId();
-      const assigneeSource = `${task.assignee ?? ''} ${task.responsible ?? ''}`.toLowerCase().trim();
-      const normalizedName = user?.name?.toLowerCase().trim();
-      const normalizedEmployeeId = employeeId ? String(employeeId).toLowerCase().trim() : undefined;
-      const matchesName = normalizedName ? assigneeSource.includes(normalizedName) : false;
-      const matchesEmployeeId = normalizedEmployeeId ? assigneeSource.includes(normalizedEmployeeId) : false;
+      const assigneeSource = `${task.assignee ?? ''}, ${task.responsible ?? ''}`.trim();
+      const assigneeTokens = [
+        ...splitAssignees(task.assignee),
+        ...splitAssignees(task.responsible),
+      ];
+      const normalizedName = normalizeToken(user?.name);
+      const normalizedEmployeeId = normalizeToken(employeeId ? String(employeeId) : undefined);
+      const matchesName = normalizedName
+        ? assigneeTokens.some(token => normalizeToken(token).includes(normalizedName)) ||
+          normalizeToken(assigneeSource).includes(normalizedName)
+        : false;
+      const matchesEmployeeId = normalizedEmployeeId
+        ? assigneeTokens.some(token => normalizeToken(token).includes(normalizedEmployeeId)) ||
+          normalizeToken(assigneeSource).includes(normalizedEmployeeId)
+        : false;
       if (isActive) {
         setIsAssignedToWorker(Boolean(assigneeSource) && (matchesName || matchesEmployeeId));
       }
@@ -117,6 +135,13 @@ export default function TaskDetailScreen() {
     }
   };
   const isTaskCompleted = task.status === 'completed';
+
+  const cameFromKanban = fromKanban === 'true';
+  const canShowCreateReportButton =
+    !isTaskCompleted &&
+    (isWorker || canCreateProgressReport) &&
+    Boolean(isAssignedToWorker) &&
+    (!cameFromKanban || canCreateProgressReport);
 
   return (
     <View style={styles.container}>
@@ -230,7 +255,7 @@ export default function TaskDetailScreen() {
         </View>
       </ScrollView>
 
-      {fromKanban !== 'true' && !isTaskCompleted && isWorker && isAssignedToWorker && (
+      {canShowCreateReportButton && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.createReportButton}
