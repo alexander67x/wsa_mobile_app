@@ -11,6 +11,9 @@ type SeverityInfo = { text: string; color: string; bg: string };
 
 const getStatusInfo = (status?: string): StatusInfo => {
   const normalized = (status || '').toLowerCase();
+  if (!normalized || ['registrada', 'registrado', 'nuevo', 'nueva'].includes(normalized)) {
+    return { text: 'Registrada', color: '#F59E0B' };
+  }
   switch (normalized) {
     case 'abierta':
       return { text: 'Abierta', color: '#F97316' };

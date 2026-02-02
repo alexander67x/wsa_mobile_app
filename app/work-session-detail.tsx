@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, MapPin, Clock } from 'lucide-react-native';
 import { COLORS } from '@/theme';
 import { AttendanceSession, getAttendanceCheck } from '@/services/attendance';
 
 const ENABLE_DETAIL_API = true;
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY || '';
 
 interface SessionView {
   startLocation: string;
@@ -14,11 +15,26 @@ interface SessionView {
   checkIn: string;
   checkOut: string;
   hoursWorked: string;
+  startCoords?: { latitude: number; longitude: number } | null;
+  endCoords?: { latitude: number; longitude: number } | null;
 }
 
 export default function WorkSessionDetail() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const apiId = typeof params.apiId === 'string' ? params.apiId : undefined;
+  const routeId = typeof params.id === 'string' ? params.id : undefined;
+  const startLocationParam = typeof params.startLocation === 'string' ? params.startLocation : undefined;
+  const endLocationParam = typeof params.endLocation === 'string' ? params.endLocation : undefined;
+  const locationParam = typeof params.location === 'string' ? params.location : undefined;
+  const dateParam = typeof params.date === 'string' ? params.date : undefined;
+  const checkInParam = typeof params.checkIn === 'string' ? params.checkIn : undefined;
+  const checkOutParam = typeof params.checkOut === 'string' ? params.checkOut : undefined;
+  const hoursWorkedParam = typeof params.hoursWorked === 'string' ? params.hoursWorked : undefined;
+  const startLatParam = typeof params.startLat === 'string' ? params.startLat : undefined;
+  const startLngParam = typeof params.startLng === 'string' ? params.startLng : undefined;
+  const endLatParam = typeof params.endLat === 'string' ? params.endLat : undefined;
+  const endLngParam = typeof params.endLng === 'string' ? params.endLng : undefined;
 
   const formatTimeShort = (date: Date) =>
     date.toLocaleTimeString('es-PE', {
@@ -46,25 +62,53 @@ export default function WorkSessionDetail() {
     const checkOut = getTimeLabel(data.checkOut, data.checkOutAt);
     const hoursWorked = data.hoursWorked != null ? `${data.hoursWorked}h trabajadas` : 'Horas no calculadas';
 
-    return { startLocation, endLocation, date, checkIn, checkOut, hoursWorked };
+    return {
+      startLocation,
+      endLocation,
+      date,
+      checkIn,
+      checkOut,
+      hoursWorked,
+      startCoords: data.startCoords ?? null,
+      endCoords: data.endCoords ?? null,
+    };
+  };
+
+  const parseCoord = (value?: string): number | null => {
+    if (!value) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
   };
 
   const buildSessionFromParams = (): SessionView => {
-    const startLocation = (params.startLocation as string) || (params.location as string) || 'Ubicación no disponible';
-    const endLocation = (params.endLocation as string) || (params.location as string) || 'Ubicación no disponible';
-    const date = (params.date as string) || 'Fecha no disponible';
-    const checkIn = (params.checkIn as string) || '--:--';
-    const checkOut = (params.checkOut as string) || '--:--';
-    const hoursWorked = params.hoursWorked ? `${params.hoursWorked}h trabajadas` : 'Horas no calculadas';
+    const startLocation = startLocationParam || locationParam || 'Ubicación no disponible';
+    const endLocation = endLocationParam || locationParam || 'Ubicación no disponible';
+    const date = dateParam || 'Fecha no disponible';
+    const checkIn = checkInParam || '--:--';
+    const checkOut = checkOutParam || '--:--';
+    const hoursWorked = hoursWorkedParam ? `${hoursWorkedParam}h trabajadas` : 'Horas no calculadas';
+    const startLat = parseCoord(startLatParam);
+    const startLng = parseCoord(startLngParam);
+    const endLat = parseCoord(endLatParam);
+    const endLng = parseCoord(endLngParam);
 
-    return { startLocation, endLocation, date, checkIn, checkOut, hoursWorked };
+    return {
+      startLocation,
+      endLocation,
+      date,
+      checkIn,
+      checkOut,
+      hoursWorked,
+      startCoords: startLat != null && startLng != null ? { latitude: startLat, longitude: startLng } : null,
+      endCoords: endLat != null && endLng != null ? { latitude: endLat, longitude: endLng } : null,
+    };
   };
 
   const [session, setSession] = useState<SessionView>(buildSessionFromParams);
 
   useEffect(() => {
     const fetchDetail = async () => {
-      const sessionId = (params.apiId as string) || (params.id as string);
+      const sessionId = apiId || routeId;
       if (!ENABLE_DETAIL_API || !sessionId) return;
       try {
         const apiSession = await getAttendanceCheck(String(sessionId));
@@ -75,43 +119,80 @@ export default function WorkSessionDetail() {
     };
 
     fetchDetail();
-  }, [params.apiId, params.id]);
+  }, [apiId, routeId]);
 
   useEffect(() => {
     setSession(buildSessionFromParams());
-  }, [params]);
+  }, [
+    startLocationParam,
+    endLocationParam,
+    locationParam,
+    dateParam,
+    checkInParam,
+    checkOutParam,
+    hoursWorkedParam,
+    startLatParam,
+    startLngParam,
+    endLatParam,
+    endLngParam,
+  ]);
 
   const LocationCard = ({
     title,
     location,
     time,
     mapLabel,
+    coords,
   }: {
     title: string;
     location: string;
     time: string;
     mapLabel: string;
-  }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {title}
-        </Text>
-        <View style={styles.timePill}>
-          <Clock size={14} color={COLORS.primary} />
-          <Text style={styles.timeText}>{time}</Text>
+    coords?: { latitude: number; longitude: number } | null;
+  }) => {
+    const [mapError, setMapError] = useState(false);
+    const mapReady = Boolean(coords && MAPTILER_KEY);
+    useEffect(() => {
+      setMapError(false);
+    }, [coords?.latitude, coords?.longitude]);
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          <View style={styles.timePill}>
+            <Clock size={14} color={COLORS.primary} />
+            <Text style={styles.timeText}>{time}</Text>
+          </View>
+        </View>
+        <View style={styles.locationRow}>
+          <MapPin size={18} color="#059669" />
+          <Text style={styles.locationText}>{location}</Text>
+        </View>
+        <View style={styles.mapPreview}>
+          <Text style={styles.mapLabel}>{mapLabel}</Text>
+          {coords ? (
+            mapReady ? (
+              mapError ? (
+                <Text style={styles.mapSubLabel}>No se pudo cargar el mapa</Text>
+              ) : (
+                <MapTile coords={coords} onError={() => setMapError(true)} />
+              )
+            ) : (
+              <Text style={styles.mapSubLabel}>Falta configurar EXPO_PUBLIC_MAPTILER_KEY</Text>
+            )
+          ) : (
+            <Text style={styles.mapSubLabel}>Coordenadas no disponibles</Text>
+          )}
+          {mapReady ? (
+            <Text style={styles.mapAttribution}>© MapTiler © OpenStreetMap contributors</Text>
+          ) : null}
         </View>
       </View>
-      <View style={styles.locationRow}>
-        <MapPin size={18} color="#059669" />
-        <Text style={styles.locationText}>{location}</Text>
-      </View>
-      <View style={styles.mapPreview}>
-        <Text style={styles.mapLabel}>{mapLabel}</Text>
-        <Text style={styles.mapSubLabel}>Vista de mapa simulada (solo frontend)</Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -133,6 +214,7 @@ export default function WorkSessionDetail() {
           location={session.startLocation}
           time={session.checkIn}
           mapLabel="Punto de inicio"
+          coords={session.startCoords}
         />
 
         <LocationCard
@@ -140,6 +222,7 @@ export default function WorkSessionDetail() {
           location={session.endLocation}
           time={session.checkOut}
           mapLabel="Punto de salida"
+          coords={session.endCoords}
         />
       </ScrollView>
     </View>
@@ -265,6 +348,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     borderWidth: 1,
     borderColor: '#E0E7FF',
+    width: '100%',
   },
   mapLabel: {
     fontSize: 14,
@@ -276,4 +360,74 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 4,
   },
+  mapAttribution: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 8,
+  },
+  mapFrame: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+    backgroundColor: '#E5E7EB',
+  },
+  mapTile: {
+    width: '100%',
+    height: '100%',
+  },
+  marker: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
 });
+
+const TILE_SIZE = 256;
+const DEFAULT_ZOOM = 15;
+
+const latLngToTile = (latitude: number, longitude: number, zoom: number) => {
+  const latRad = (latitude * Math.PI) / 180;
+  const n = 2 ** zoom;
+  const x = ((longitude + 180) / 360) * n;
+  const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+  return { x, y };
+};
+
+const buildMapTilerTileUrl = (zoom: number, tileX: number, tileY: number) =>
+  `https://api.maptiler.com/maps/streets/${zoom}/${tileX}/${tileY}.png?key=${MAPTILER_KEY}`;
+
+const MapTile = ({
+  coords,
+  onError,
+}: {
+  coords: { latitude: number; longitude: number };
+  onError: () => void;
+}) => {
+  if (!MAPTILER_KEY) return null;
+  const zoom = DEFAULT_ZOOM;
+  const tile = latLngToTile(coords.latitude, coords.longitude, zoom);
+  const tileX = Math.floor(tile.x);
+  const tileY = Math.floor(tile.y);
+  const url = buildMapTilerTileUrl(zoom, tileX, tileY);
+  const offsetX = (tile.x - tileX) * TILE_SIZE;
+  const offsetY = (tile.y - tileY) * TILE_SIZE;
+  const markerLeft = Math.max(6, Math.min(TILE_SIZE - 6, offsetX)) - 7;
+  const markerTop = Math.max(6, Math.min(TILE_SIZE - 6, offsetY)) - 7;
+
+  return (
+    <ImageBackground source={{ uri: url }} style={styles.mapFrame} imageStyle={styles.mapTile} onError={onError}>
+      <View style={[styles.marker, { left: markerLeft, top: markerTop }]} />
+    </ImageBackground>
+  );
+};

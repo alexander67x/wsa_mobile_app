@@ -213,19 +213,25 @@ export default function CreateReportScreen() {
         })
         .finally(() => setIsLoadingCatalog(false));
 
-      // Load project stock to validate material availability
-      setIsLoadingStock(true);
-      getProjectStock(String(resolvedProjectId))
-        .then((stock) => {
-          setProjectStock(stock?.materials || []);
-          setStockValidationReady(true);
-        })
-        .catch((error) => {
-          console.error('Error loading project stock:', error);
-          setProjectStock([]);
-          setStockValidationReady(false);
-        })
-        .finally(() => setIsLoadingStock(false));
+      // Load project stock to validate material availability (skip for incidents)
+      if (isIncidentFlow) {
+        setIsLoadingStock(false);
+        setProjectStock([]);
+        setStockValidationReady(true);
+      } else {
+        setIsLoadingStock(true);
+        getProjectStock(String(resolvedProjectId))
+          .then((stock) => {
+            setProjectStock(stock?.materials || []);
+            setStockValidationReady(true);
+          })
+          .catch((error) => {
+            console.error('Error loading project stock:', error);
+            setProjectStock([]);
+            setStockValidationReady(false);
+          })
+          .finally(() => setIsLoadingStock(false));
+      }
     } else {
       setIsLoadingProject(false);
       setStockValidationReady(false);
@@ -328,7 +334,7 @@ export default function CreateReportScreen() {
       Alert.alert('Cargando catálogo', 'Espera un momento mientras se cargan los materiales.');
       return;
     }
-    if (isLoadingStock) {
+    if (!isIncidentFlow && isLoadingStock) {
       Alert.alert('Cargando stock', 'Espera un momento mientras se valida el stock del almacén.');
       return;
     }
@@ -360,6 +366,7 @@ export default function CreateReportScreen() {
     );
 
   const resolveAvailableQty = (materialId: string | number) => {
+    if (isIncidentFlow) return null;
     if (!stockValidationReady) return null;
     const item = resolveStockItem(materialId);
     if (!item) return 0;
@@ -369,6 +376,7 @@ export default function CreateReportScreen() {
   };
 
   const validateMaterialsAvailability = () => {
+    if (isIncidentFlow) return [];
     if (!stockValidationReady && selectedMaterials.length > 0) {
       return ['No se pudo validar el stock del almacén asignado'];
     }
@@ -407,13 +415,13 @@ export default function CreateReportScreen() {
       return;
     }
 
-    if (!stockValidationReady) {
+    if (!isIncidentFlow && !stockValidationReady) {
       Alert.alert('Stock no disponible', 'No se pudo validar el stock del almacén asignado. Intenta de nuevo.');
       return;
     }
 
     const availableQty = resolveAvailableQty(selectedMaterialForAdd);
-    if (availableQty !== null && quantity > availableQty) {
+    if (!isIncidentFlow && availableQty !== null && quantity > availableQty) {
       Alert.alert(
         'Cantidad excede disponibilidad',
         `No puedes usar más de ${availableQty} ${material.unit || ''} para este material.`

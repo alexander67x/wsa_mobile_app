@@ -73,6 +73,51 @@ const toOptionalString = (value: unknown): string | undefined => {
   return str.length ? str : undefined;
 };
 
+const splitListString = (value: string): string[] =>
+  value
+    .split(/[,;|/]+/)
+    .map(entry => entry.trim())
+    .filter(Boolean);
+
+const coerceStringList = (value: unknown): string[] => {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap(entry => coerceStringList(entry));
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const candidate = toOptionalString(
+      (obj.name ??
+        obj.nombre ??
+        obj.fullName ??
+        obj.full_name ??
+        obj.label ??
+        obj.value ??
+        obj.usuario ??
+        obj.user ??
+        obj.responsable ??
+        obj.assignee) as unknown,
+    );
+    return candidate ? splitListString(candidate) : [];
+  }
+  const candidate = toOptionalString(value);
+  return candidate ? splitListString(candidate) : [];
+};
+
+const dedupeStrings = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  values.forEach(value => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(trimmed);
+  });
+  return result;
+};
+
 const asTaskObject = (card: ExtendedKanbanCard): Record<string, unknown> | undefined => {
   const task = card.task;
   return task && typeof task === 'object' ? task : undefined;
@@ -316,8 +361,12 @@ export default function KanbanBoardScreen({
           toOptionalString((project as { nombre?: string }).nombre);
         if (name) return name;
       }
+      if (typeof project === 'string' && project.trim()) return project;
       const projectName =
         toOptionalString((task as { projectName?: string }).projectName) ??
+        toOptionalString((task as { project_name?: string }).project_name) ??
+        toOptionalString((task as { proyecto?: string }).proyecto) ??
+        toOptionalString((task as { proyectoNombre?: string }).proyectoNombre) ??
         toOptionalString((task as { project_label?: string }).project_label) ??
         toOptionalString((task as { projectTitle?: string }).projectTitle);
       if (projectName) return projectName;
@@ -328,41 +377,68 @@ export default function KanbanBoardScreen({
       if (typeof name === 'string' && name.trim()) return name;
     }
     if (typeof rawProject === 'string' && rawProject.trim()) return rawProject;
-    return (
+    const projectLabel =
       card.project ??
       card.projectName ??
       (card as any).projectTitle ??
-      (card as any).project_label ??
-      'Proyecto sin nombre'
-    );
+      (card as any).project_label;
+    if (projectLabel) return projectLabel;
+    const projectId =
+      toOptionalString((task as any)?.projectId) ??
+      toOptionalString((task as any)?.project_id) ??
+      toOptionalString((task as any)?.proyectoId) ??
+      toOptionalString((task as any)?.proyecto_id) ??
+      toOptionalString(card.projectId) ??
+      toOptionalString((card as any).projectId) ??
+      toOptionalString((card as any).project_id);
+    if (projectId) return `Proyecto ${projectId}`;
+    return 'Proyecto sin nombre';
   };
 
   const getCardAssignee = (card: ExtendedKanbanCard) => {
     const task = asTaskObject(card);
-    if (task) {
-      const assignee =
-        toOptionalString((task as { assignee?: string }).assignee) ??
-        toOptionalString((task as { assigneeName?: string }).assigneeName) ??
-        toOptionalString((task as { assignedTo?: string }).assignedTo) ??
-        toOptionalString((task as { assigned_to?: string }).assigned_to) ??
-        toOptionalString((task as { responsable?: string }).responsable);
-      if (assignee) return assignee;
-      const assigneeObj = (task as { assignee?: { name?: string; nombre?: string } }).assignee;
-      if (assigneeObj && typeof assigneeObj === 'object') {
-        const name =
-          toOptionalString((assigneeObj as { name?: string }).name) ??
-          toOptionalString((assigneeObj as { nombre?: string }).nombre);
-        if (name) return name;
-      }
-    }
-    return (
-      card.assignee ??
-      card.assigneeName ??
-      (card as any).assignedTo ??
-      (card as any).assigned_to ??
-      card.authorName ??
-      'Sin asignar'
-    );
+    const list = dedupeStrings([
+      ...(task ? coerceStringList((task as any).assignees) : []),
+      ...(task ? coerceStringList((task as any).assignedTo) : []),
+      ...(task ? coerceStringList((task as any).assigned_to) : []),
+      ...(task ? coerceStringList((task as any).asignados) : []),
+      ...(task ? coerceStringList((task as any).asignadosA) : []),
+      ...(task ? coerceStringList((task as any).asignadoA) : []),
+      ...(task ? coerceStringList((task as any).assignee) : []),
+      ...(task ? coerceStringList((task as any).asignado) : []),
+      ...(task ? coerceStringList((task as any).assigneeName) : []),
+      ...(task ? coerceStringList((task as any).responsables) : []),
+      ...(task ? coerceStringList((task as any).responsable) : []),
+      ...(task ? coerceStringList((task as any).responsable_nombre) : []),
+      ...(task ? coerceStringList((task as any).responsableName) : []),
+      ...(task ? coerceStringList((task as any).encargado) : []),
+      ...(task ? coerceStringList((task as any).owner) : []),
+      ...coerceStringList(card.assignee),
+      ...coerceStringList(card.assigneeName),
+      ...coerceStringList((card as any).assignees),
+      ...coerceStringList((card as any).responsables),
+      ...coerceStringList((card as any).responsable),
+      ...coerceStringList((card as any).responsible),
+      ...coerceStringList((card as any).responsibles),
+      ...coerceStringList((card as any).responsibleIds),
+      ...coerceStringList((card as any).assignedTo),
+      ...coerceStringList((card as any).assigned_to),
+      ...coerceStringList((card as any).asignados),
+      ...coerceStringList((card as any).asignadosA),
+      ...coerceStringList((card as any).asignadoA),
+      ...coerceStringList(card.authorName),
+      ...coerceStringList((card as any).metadata?.assignees),
+      ...coerceStringList((card as any).metadata?.assignedTo),
+      ...coerceStringList((card as any).metadata?.assigned_to),
+      ...coerceStringList((card as any).metadata?.assignee),
+      ...coerceStringList((card as any).metadata?.responsables),
+      ...coerceStringList((card as any).metadata?.responsable),
+      ...coerceStringList((card as any).metadata?.responsable_nombre),
+      ...coerceStringList((card as any).metadata?.responsableName),
+    ]);
+
+    if (list.length) return list.join(', ');
+    return 'Sin asignar';
   };
 
   const getCardType = (card: ExtendedKanbanCard) => {

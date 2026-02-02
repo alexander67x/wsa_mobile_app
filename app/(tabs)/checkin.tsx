@@ -350,6 +350,11 @@ export default function CheckInScreen() {
   };
 
   const handleViewDetails = (record: CheckInRecord) => {
+    const startLat = record.startCoords?.latitude;
+    const startLng = record.startCoords?.longitude;
+    const endLat = record.endCoords?.latitude;
+    const endLng = record.endCoords?.longitude;
+
     router.push({
       pathname: '/work-session-detail',
       params: {
@@ -362,6 +367,10 @@ export default function CheckInScreen() {
         startLocation: record.startLocationLabel || record.location,
         endLocation: record.endLocationLabel || record.location,
         hoursWorked: record.hoursWorked ? String(record.hoursWorked) : '',
+        startLat: startLat != null ? String(startLat) : '',
+        startLng: startLng != null ? String(startLng) : '',
+        endLat: endLat != null ? String(endLat) : '',
+        endLng: endLng != null ? String(endLng) : '',
       },
     });
   };
