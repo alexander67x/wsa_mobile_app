@@ -161,6 +161,13 @@ export default function IncidentDetailScreen() {
           </View>
         )}
 
+        {!!data.registrationComment && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Comentario de registro</Text>
+            <Text style={styles.sectionText}>{data.registrationComment}</Text>
+          </View>
+        )}
+
         {!!data.solution && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Solucion</Text>

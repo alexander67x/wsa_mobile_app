@@ -6,7 +6,6 @@ import {
   Settings,
   FolderSync as Sync,
   LogOut,
-  Bell,
   Shield,
   CircleHelp as HelpCircle,
   Phone,
@@ -243,6 +242,10 @@ export default function ProfileScreen() {
   };
   const activeProjects = useMemo(() => projectsList.filter(project => project.status !== 'completed'), [projectsList]);
   const completedProjects = useMemo(() => projectsList.filter(project => project.status === 'completed'), [projectsList]);
+  const isProjectLead = useMemo(() => {
+    const roleValue = (profile?.role || '').toLowerCase();
+    return roleValue.includes('responsable') || roleValue.includes('responsable_proyecto') || roleValue.includes('project lead');
+  }, [profile?.role]);
   const sortedProjects = useMemo(() => {
     const copy = [...projectsList];
     copy.sort((a, b) => {
@@ -466,63 +469,31 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        <View style={styles.optionsSection}>
-          <Text style={styles.sectionTitle}>Configuración</Text>
+        {!isProjectLead && (
+          <View style={styles.supportSection}>
+            <Text style={styles.sectionTitle}>Soporte</Text>
 
-          <View style={styles.optionsCard}>
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionLeft}>
-                <Bell size={20} color={COLORS.mutedText} />
-                <Text style={styles.optionText}>Notificaciones</Text>
-              </View>
-              <Text style={styles.optionArrow}>›</Text>
-            </TouchableOpacity>
+            <View style={styles.optionsCard}>
+              <TouchableOpacity style={styles.optionItem}>
+                <View style={styles.optionLeft}>
+                  <HelpCircle size={20} color={COLORS.mutedText} />
+                  <Text style={styles.optionText}>Centro de Ayuda</Text>
+                </View>
+                <Text style={styles.optionArrow}>›</Text>
+              </TouchableOpacity>
 
-            <View style={styles.optionDivider} />
+              <View style={styles.optionDivider} />
 
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionLeft}>
-                <Shield size={20} color={COLORS.mutedText} />
-                <Text style={styles.optionText}>Privacidad y Seguridad</Text>
-              </View>
-              <Text style={styles.optionArrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={styles.optionDivider} />
-
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionLeft}>
-                <Settings size={20} color={COLORS.mutedText} />
-                <Text style={styles.optionText}>Configuraciones Generales</Text>
-              </View>
-              <Text style={styles.optionArrow}>›</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.optionItem}>
+                <View style={styles.optionLeft}>
+                  <Phone size={20} color={COLORS.mutedText} />
+                  <Text style={styles.optionText}>Contactar Soporte</Text>
+                </View>
+                <Text style={styles.optionArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-
-        <View style={styles.supportSection}>
-          <Text style={styles.sectionTitle}>Soporte</Text>
-
-          <View style={styles.optionsCard}>
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionLeft}>
-                <HelpCircle size={20} color={COLORS.mutedText} />
-                <Text style={styles.optionText}>Centro de Ayuda</Text>
-              </View>
-              <Text style={styles.optionArrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={styles.optionDivider} />
-
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionLeft}>
-                <Phone size={20} color={COLORS.mutedText} />
-                <Text style={styles.optionText}>Contactar Soporte</Text>
-              </View>
-              <Text style={styles.optionArrow}>›</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
 
         <View style={styles.logoutSection}>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={syncStatus === 'syncing'}>

@@ -118,19 +118,20 @@ export default function MaterialsScreen() {
   const renderProgress = (progress?: number | null, approved?: number, delivered?: number) => {
     if (progress === null || progress === undefined) {
       if (!approved || approved <= 0) return null;
-      progress = Math.min(100, Math.round(((delivered ?? 0) / approved) * 100));
+      progress = ((delivered ?? 0) / approved) * 100;
     }
 
     const safeProgress = Math.min(100, Math.max(0, progress));
+    const displayProgress = Math.round(safeProgress * 100) / 100;
 
     return (
       <View style={styles.progressContainer}>
         <View style={styles.progressHeader}>
           <Text style={styles.progressLabel}>Avance de entrega</Text>
-          <Text style={styles.progressValue}>{safeProgress}%</Text>
+          <Text style={styles.progressValue}>{displayProgress}%</Text>
         </View>
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${safeProgress}%` }]} />
+          <View style={[styles.progressFill, { width: `${displayProgress}%` }]} />
         </View>
       </View>
     );
@@ -224,13 +225,6 @@ export default function MaterialsScreen() {
               </View>
 
               <View style={styles.quantityContainer}>
-                <View style={styles.quantityInfo}>
-                  <Package size={16} color="#6B7280" />
-                  <Text style={styles.quantityText}>
-                    {(request.quantity ?? request.totalApprovedQuantity ?? request.totalDeliveredQuantity ?? 0)}{' '}
-                    {request.unit || 'unidades'}
-                  </Text>
-                </View>
                 <View style={[styles.urgencyBadge, { backgroundColor: `${getUrgencyColor(request.urgent)}20` }]}>
                   <Text style={[styles.urgencyText, { color: getUrgencyColor(request.urgent) }]}>
                     {getUrgencyText(request.urgent)}

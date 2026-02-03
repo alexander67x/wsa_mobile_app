@@ -55,6 +55,7 @@ export interface Incident {
   authorName?: string | null;
   assignedToId?: string | null;
   assignedToName?: string | null;
+  registrationComment?: string | null;
 }
 
 export interface IncidentDetail extends Incident {

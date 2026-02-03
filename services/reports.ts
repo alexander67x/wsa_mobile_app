@@ -175,7 +175,11 @@ const mapReportStatus = (status?: MaybeString): Report['status'] => {
   }
 };
 
-export async function listReports(projectId?: string, taskId?: string): Promise<(Report & { taskId?: string; taskTitle?: string })[]> {
+export async function listReports(
+  projectId?: string,
+  taskId?: string,
+  options?: { allowAllForTask?: boolean }
+): Promise<(Report & { taskId?: string; taskTitle?: string })[]> {
   const user = getUser();
   const role = getRole();
   const ensuredEmployeeId = await (await import('@/services/auth')).ensureEmployeeId();
@@ -193,7 +197,9 @@ export async function listReports(projectId?: string, taskId?: string): Promise<
   let filteredReports = apiReports;
   const currentAuthorId = user ? (user.employeeId || ensuredEmployeeId || user.id) : ensuredEmployeeId || null;
   
-  if (role === 'worker' && currentAuthorId) {
+  const allowAllForTask = Boolean(options?.allowAllForTask && taskId);
+
+  if (role === 'worker' && currentAuthorId && !allowAllForTask) {
     // Worker (sin privilegios): solo sus propios reportes
     const authorKey = String(currentAuthorId);
     filteredReports = apiReports.filter(r => String(r.authorId ?? '') === authorKey);

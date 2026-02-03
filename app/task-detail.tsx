@@ -30,6 +30,72 @@ export default function TaskDetailScreen() {
       .map(entry => entry.trim())
       .filter(Boolean);
 
+  const collectIdTokens = (value: unknown, target: string[]) => {
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      value.forEach(entry => collectIdTokens(entry, target));
+      return;
+    }
+    if (typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      const idCandidate =
+        record.id ??
+        record.cod_empleado ??
+        record.codEmpleado ??
+        record.employeeId ??
+        record.employee_id ??
+        record.cod_empleado_id;
+      if (idCandidate !== undefined && idCandidate !== null) {
+        collectIdTokens(idCandidate, target);
+      }
+      return;
+    }
+    target.push(String(value));
+  };
+
+  const resolveAssignment = async (taskDetail: TaskDetail, rawTask: Record<string, unknown>) => {
+    const shouldValidateAssignment = isWorker || canCreateProgressReport;
+    if (!shouldValidateAssignment) return true;
+
+    const user = getUser();
+    const employeeId = await ensureEmployeeId();
+    const normalizedName = normalizeToken(user?.name);
+    const normalizedEmployeeId = normalizeToken(employeeId ? String(employeeId) : undefined);
+
+    const idTokens: string[] = [];
+    collectIdTokens(rawTask?.responsibleIds, idTokens);
+    collectIdTokens(rawTask?.responsibleId, idTokens);
+    collectIdTokens(rawTask?.responsibles, idTokens);
+    collectIdTokens(rawTask?.responsables, idTokens);
+    collectIdTokens(rawTask?.assigneeIds, idTokens);
+    collectIdTokens(rawTask?.assigneeId, idTokens);
+    collectIdTokens(rawTask?.assignees, idTokens);
+    collectIdTokens(rawTask?.asignados, idTokens);
+    collectIdTokens(rawTask?.asignado, idTokens);
+    collectIdTokens(rawTask?.assignedTo, idTokens);
+    collectIdTokens(rawTask?.assigned_to, idTokens);
+
+    if (normalizedEmployeeId && idTokens.some(token => normalizeToken(token) === normalizedEmployeeId)) {
+      return true;
+    }
+
+    const assigneeSource = `${taskDetail.assignee ?? ''}, ${taskDetail.responsible ?? ''}`.trim();
+    const assigneeTokens = [
+      ...splitAssignees(taskDetail.assignee),
+      ...splitAssignees(taskDetail.responsible),
+    ];
+    const matchesName = normalizedName
+      ? assigneeTokens.some(token => normalizeToken(token).includes(normalizedName)) ||
+        normalizeToken(assigneeSource).includes(normalizedName)
+      : false;
+    const matchesEmployeeId = normalizedEmployeeId
+      ? assigneeTokens.some(token => normalizeToken(token).includes(normalizedEmployeeId)) ||
+        normalizeToken(assigneeSource).includes(normalizedEmployeeId)
+      : false;
+
+    return Boolean(assigneeSource) && (matchesName || matchesEmployeeId);
+  };
+
   const loadTask = async () => {
     if (!projectId || !taskId) {
       Alert.alert('Error', 'Faltan parámetros necesarios');
@@ -39,10 +105,14 @@ export default function TaskDetailScreen() {
 
     setIsLoading(true);
     try {
-      const [taskResponse, reportsData] = await Promise.all([
-        getTask(String(taskId)),
-        listReports(String(projectId), String(taskId)),
-      ]);
+      const taskResponse = await getTask(String(taskId));
+      const assigned = await resolveAssignment(taskResponse.task, taskResponse.raw);
+      setIsAssignedToWorker(assigned);
+
+      const reportsData = await listReports(String(projectId), String(taskId), {
+        allowAllForTask: assigned,
+      });
+
       setTask(taskResponse.task);
       setProjectName(taskResponse.task.projectName || '');
       // Los reportes ya vienen filtrados por taskId desde la API
@@ -62,43 +132,10 @@ export default function TaskDetailScreen() {
   }, [projectId, taskId]);
 
   useEffect(() => {
-    let isActive = true;
-    const resolveAssignment = async () => {
-      if (!task) {
-        if (isActive) setIsAssignedToWorker(null);
-        return;
-      }
-      const shouldValidateAssignment = isWorker || canCreateProgressReport;
-      if (!shouldValidateAssignment) {
-        if (isActive) setIsAssignedToWorker(true);
-        return;
-      }
-      const user = getUser();
-      const employeeId = await ensureEmployeeId();
-      const assigneeSource = `${task.assignee ?? ''}, ${task.responsible ?? ''}`.trim();
-      const assigneeTokens = [
-        ...splitAssignees(task.assignee),
-        ...splitAssignees(task.responsible),
-      ];
-      const normalizedName = normalizeToken(user?.name);
-      const normalizedEmployeeId = normalizeToken(employeeId ? String(employeeId) : undefined);
-      const matchesName = normalizedName
-        ? assigneeTokens.some(token => normalizeToken(token).includes(normalizedName)) ||
-          normalizeToken(assigneeSource).includes(normalizedName)
-        : false;
-      const matchesEmployeeId = normalizedEmployeeId
-        ? assigneeTokens.some(token => normalizeToken(token).includes(normalizedEmployeeId)) ||
-          normalizeToken(assigneeSource).includes(normalizedEmployeeId)
-        : false;
-      if (isActive) {
-        setIsAssignedToWorker(Boolean(assigneeSource) && (matchesName || matchesEmployeeId));
-      }
-    };
-    resolveAssignment();
-    return () => {
-      isActive = false;
-    };
-  }, [task, isWorker]);
+    if (!task) {
+      setIsAssignedToWorker(null);
+    }
+  }, [task]);
 
   if (isLoading || !task) {
     return (
