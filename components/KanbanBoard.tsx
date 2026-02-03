@@ -420,7 +420,6 @@ export default function KanbanBoardScreen({
       ...coerceStringList((card as any).responsable),
       ...coerceStringList((card as any).responsible),
       ...coerceStringList((card as any).responsibles),
-      ...coerceStringList((card as any).responsibleIds),
       ...coerceStringList((card as any).assignedTo),
       ...coerceStringList((card as any).assigned_to),
       ...coerceStringList((card as any).asignados),
@@ -437,6 +436,21 @@ export default function KanbanBoardScreen({
       ...coerceStringList((card as any).metadata?.responsableName),
     ]);
 
+    const sanitizeToken = (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      const withoutTrailingId = trimmed
+        .replace(/\s*(?:#|\(|\[)?\s*\d{2,}\s*(?:\)|\])?\s*$/u, '')
+        .replace(/\s*[-–—]\s*\d{2,}\s*$/u, '')
+        .trim();
+      return withoutTrailingId;
+    };
+
+    const sanitized = list
+      .map(token => sanitizeToken(token))
+      .filter(token => token && !/^\d+$/.test(token));
+
+    if (sanitized.length) return sanitized.join(', ');
     if (list.length) return list.join(', ');
     return 'Sin asignar';
   };
